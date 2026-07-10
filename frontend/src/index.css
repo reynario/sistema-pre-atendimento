@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-ground text-ink font-sans antialiased;
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full rounded-xl bg-pine px-4 py-3 text-sm font-bold text-white transition
+      hover:bg-pine-strong disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-xl border border-ink/10 bg-surface-2 px-4 py-3 text-sm font-bold text-ink
+      transition hover:bg-ground disabled:opacity-50;
+  }
+  .card {
+    @apply rounded-2xl border border-ink/10 bg-surface p-4;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink/15 bg-surface px-3.5 py-2.5 text-sm
+      placeholder:text-ink-faint focus:border-pine focus:outline-none focus:ring-2 focus:ring-pine/20;
+  }
+  .label {
+    @apply mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold;
+  }
+}

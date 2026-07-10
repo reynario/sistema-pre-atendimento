@@ -1,0 +1,307 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+}
+
+enum ContactStatus {
+  NOVO
+  CONVERSANDO
+  AGENDADO
+  CONFIRMADO
+  COMPARECEU
+  FALTOU
+  PERDIDO
+}
+
+enum ConversationStatus {
+  IA
+  HUMANO
+  FECHADA
+}
+
+enum MessageDirection {
+  IN
+  OUT
+}
+
+enum MessageSender {
+  LEAD
+  IA
+  HUMANO
+  SISTEMA
+}
+
+enum AppointmentStatus {
+  AGENDADO
+  CONFIRMADO
+  CONCLUIDO
+  FALTOU
+  CANCELADO
+}
+
+enum PlanCycle {
+  MENSAL
+  TRIMESTRAL
+  ANUAL
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ATIVA
+  INADIMPLENTE
+  CANCELADA
+}
+
+enum JobStatus {
+  PENDENTE
+  ENVIADO
+  CANCELADO
+}
+
+model Tenant {
+  id             String             @id @default(cuid())
+  name           String
+  slug           String             @unique
+  whatsappNumber String?
+  // Token da instância na UazAPI (uma instância por clínica)
+  uazapiToken    String?
+  // Token aleatório que compõe a URL do webhook desta clínica
+  webhookToken   String             @unique
+
+  // Configurações da IA
+  aiEnabled         Boolean @default(true)
+  aiTone            String  @default("amigável e informal")
+  aiScheduleStart   String  @default("08:00")
+  aiScheduleEnd     String  @default("19:00")
+  aiScheduleDays    String  @default("1,2,3,4,5,6") // 0=dom ... 6=sáb
+  afterHoursMessage String  @default("Nosso atendimento funciona em horário comercial, mas pode deixar sua dúvida que respondo assim que possível! 😊")
+
+  // Follow-up de lead sumido
+  followUpEnabled Boolean @default(true)
+  followUpHours   Int     @default(4)
+
+  // Lembretes de consulta (horas antes; o segundo é opcional)
+  reminderHours1 Int  @default(24)
+  reminderHours2 Int? @default(2)
+
+  // Regras de agendamento
+  minAdvanceMinutes Int @default(60)
+
+  // Plano / assinatura
+  planCycle          PlanCycle          @default(MENSAL)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  users             User[]
+  contacts          Contact[]
+  conversations     Conversation[]
+  messages          Message[]
+  services          Service[]
+  professionals     Professional[]
+  availabilityRules AvailabilityRule[]
+  scheduleBlocks    ScheduleBlock[]
+  appointments      Appointment[]
+  knowledgeItems    KnowledgeItem[]
+  notifications     Notification[]
+  followUps         FollowUp[]
+  reminders         Reminder[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(OWNER)
+  createdAt    DateTime @default(now())
+}
+
+model Contact {
+  id         String        @id @default(cuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phone      String
+  name       String?
+  status     ContactStatus @default(NOVO)
+  tags       String[]      @default([])
+  lostReason String?
+  optOut     Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  conversation Conversation?
+  appointments Appointment[]
+  followUps    FollowUp[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, status])
+}
+
+model Conversation {
+  id            String             @id @default(cuid())
+  tenantId      String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId     String             @unique
+  contact       Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status        ConversationStatus @default(IA)
+  lastMessageAt DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+
+  messages Message[]
+
+  @@index([tenantId, status])
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  tenantId       String
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      MessageDirection
+  sender         MessageSender
+  type           String           @default("text")
+  content        String
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Professional {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name     String
+
+  services          Service[]
+  availabilityRules AvailabilityRule[]
+  scheduleBlocks    ScheduleBlock[]
+  appointments      Appointment[]
+}
+
+model Service {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  durationMin    Int
+  priceCents     Int
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  active         Boolean       @default(true)
+
+  appointments Appointment[]
+
+  @@index([tenantId])
+}
+
+model AvailabilityRule {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  weekday        Int // 0=domingo ... 6=sábado
+  startTime      String // "08:00"
+  endTime        String // "18:00"
+
+  @@index([tenantId, weekday])
+}
+
+model ScheduleBlock {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+
+  @@index([tenantId, startsAt])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  professionalId String?
+  professional   Professional?     @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(AGENDADO)
+  createdBy      String            @default("HUMANO") // "IA" | "HUMANO"
+  notes          String?
+  createdAt      DateTime          @default(now())
+
+  reminders Reminder[]
+
+  @@index([tenantId, startsAt])
+}
+
+model KnowledgeItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type      String // ESCALADO | AGENDAMENTO | CANCELAMENTO | CONFIRMACAO | FOLLOWUP
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model FollowUp {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId    String
+  contact      Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  scheduledFor DateTime
+  status       JobStatus @default(PENDENTE)
+  attempt      Int       @default(1)
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, status])
+}
+
+model Reminder {
+  id            String      @id @default(cuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  scheduledFor  DateTime
+  status        JobStatus   @default(PENDENTE)
+
+  @@index([tenantId, status])
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Alô — Pré-atendimento com IA",
+  "short_name": "Alô",
+  "description": "IA que atende, qualifica e agenda seus leads no WhatsApp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EEF1EC",
+  "theme_color": "#1F6E5C",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
