@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, fmtPrice } from "../api";
 import { useAuth } from "../auth";
 import ScheduleEditor from "../components/ScheduleEditor";
+import WhatsAppConnect from "../components/WhatsAppConnect";
 
 const STEPS = ["Serviços", "Horários", "Conhecimento", "WhatsApp"] as const;
 
@@ -189,58 +190,28 @@ function StepKnowledge({ onNext }: { onNext: () => void }) {
 
 function StepWhatsApp({ onFinish }: { onFinish: () => void }) {
   const [settings, setSettings] = useState<any | null>(null);
-  const [token, setToken] = useState("");
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void api<any>("/settings").then((s) => {
-      setSettings(s);
-      setToken(s.uazapiToken ?? "");
-    });
+    void api<any>("/settings").then(setSettings).catch(() => {});
   }, []);
-
-  const save = async () => {
-    setBusy(true);
-    try {
-      if (token.trim()) {
-        await api("/settings", { method: "PATCH", body: { uazapiToken: token.trim() } });
-      }
-      onFinish();
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <StepWrap
       title="Conectar o WhatsApp"
-      subtitle="Este passo pede o token da sua instância na UazAPI. Se preferir, dá pra fazer depois em Minha IA — o playground funciona sem isso."
+      subtitle="Um clique gera o QR code — escaneie com o WhatsApp da clínica e a atendente assume o número. Dá pra fazer depois em Minha IA; o playground funciona sem isso."
     >
-      <div className="card space-y-3">
-        <div>
-          <label className="label">Token da instância UazAPI</label>
-          <input className="input" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Cole o token aqui (opcional)" />
-        </div>
-        {settings && (
-          <div>
-            <label className="label">URL do webhook (configure na UazAPI)</label>
-            <div className="flex items-center gap-2">
-              <code className="block flex-1 overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 text-xs">
-                {settings.webhookUrl}
-              </code>
-              <button
-                type="button"
-                className="chip flex-none border border-ink/10 text-ink-muted"
-                onClick={() => void navigator.clipboard.writeText(settings.webhookUrl)}
-              >
-                Copiar
-              </button>
-            </div>
-          </div>
+      <div className="card">
+        {settings ? (
+          <WhatsAppConnect
+            webhookUrl={settings.webhookUrl}
+            uazapiToken={settings.uazapiToken ?? null}
+          />
+        ) : (
+          <p className="text-sm text-ink-muted">Carregando…</p>
         )}
       </div>
-      <button className="btn-primary mt-3" onClick={() => void save()} disabled={busy}>
-        {busy ? "Salvando…" : "Concluir e testar minha IA 🎉"}
+      <button className="btn-primary mt-3" onClick={onFinish}>
+        Concluir e testar minha IA 🎉
       </button>
       <SkipRow onSkip={onFinish} label="Conectar depois" />
     </StepWrap>

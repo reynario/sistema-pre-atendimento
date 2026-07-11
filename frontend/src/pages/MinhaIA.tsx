@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { PageHeader, Spinner } from "../components/ui";
+import WhatsAppConnect from "../components/WhatsAppConnect";
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -21,14 +22,12 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 
 export default function MinhaIA() {
   const [settings, setSettings] = useState<any | null>(null);
-  const [waStatus, setWaStatus] = useState<any | null>(null);
   const [knowledge, setKnowledge] = useState<any[]>([]);
   const [saved, setSaved] = useState(false);
 
   const load = () => {
     void api<any>("/settings").then(setSettings).catch(() => {});
     void api<any[]>("/knowledge").then(setKnowledge).catch(() => {});
-    void api<any>("/settings/whatsapp-status").then(setWaStatus).catch(() => {});
   };
   useEffect(load, []);
 
@@ -61,68 +60,12 @@ export default function MinhaIA() {
 
       {/* Conexão WhatsApp */}
       <section className="card space-y-3">
-        <h2 className="text-sm font-bold">Conexão com o WhatsApp (UazAPI)</h2>
-        {waStatus?.connected ? (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-pine-strong">● Conectado — a IA está atendendo seu número.</p>
-            <button
-              className="chip flex-none border border-brick/30 text-brick"
-              onClick={async () => {
-                if (
-                  !confirm(
-                    "Desconectar o WhatsApp? A IA para de atender na hora. Use isso para trocar de número — depois é só colar o token da nova instância e escanear o QR de novo.",
-                  )
-                )
-                  return;
-                await api("/settings/whatsapp-disconnect", { method: "POST" });
-                load();
-              }}
-            >
-              Desconectar / trocar número
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-ink-muted">
-              1. Crie uma instância no seu painel da UazAPI e cole o <strong>token da instância</strong> abaixo.
-              <br />
-              2. Configure o webhook da instância com a URL abaixo.
-              <br />
-              3. Escaneie o QR code no painel da UazAPI com o WhatsApp da clínica.
-            </p>
-            <div>
-              <label className="label">Token da instância UazAPI</label>
-              <div className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  defaultValue={settings.uazapiToken ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v !== (settings.uazapiToken ?? "")) void patch({ uazapiToken: v || null });
-                  }}
-                  placeholder="Cole o token aqui"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="label">URL do webhook (cole na UazAPI)</label>
-              <div className="flex items-center gap-2">
-                <code className="block flex-1 overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 text-xs">
-                  {settings.webhookUrl}
-                </code>
-                <button
-                  className="chip flex-none border border-ink/10 text-ink-muted"
-                  onClick={() => void navigator.clipboard.writeText(settings.webhookUrl)}
-                >
-                  Copiar
-                </button>
-              </div>
-            </div>
-            {waStatus?.qrcode && (
-              <img src={waStatus.qrcode} alt="QR code do WhatsApp" className="mx-auto w-48 rounded-xl border border-ink/10" />
-            )}
-          </>
-        )}
+        <h2 className="text-sm font-bold">Conexão com o WhatsApp</h2>
+        <WhatsAppConnect
+          webhookUrl={settings.webhookUrl}
+          uazapiToken={settings.uazapiToken ?? null}
+          onChange={load}
+        />
       </section>
 
       {/* Configurações da IA */}

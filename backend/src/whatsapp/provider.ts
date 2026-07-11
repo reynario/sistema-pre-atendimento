@@ -12,6 +12,12 @@ export interface WhatsAppProvider {
   getStatus(tenant: Tenant): Promise<{ connected: boolean; qrcode?: string }>;
   /** Desconecta a sessão do WhatsApp na instância (para trocar de número). */
   disconnect(tenant: Tenant): Promise<void>;
+  /** Cria uma instância nova via token admin e retorna o token dela. */
+  createInstance(name: string): Promise<string>;
+  /** Configura a URL de webhook da instância (eventos de mensagens). */
+  configureWebhook(tenant: Tenant, url: string): Promise<void>;
+  /** Inicia o pareamento e retorna o QR code (se disponível de imediato). */
+  connect(tenant: Tenant): Promise<{ qrcode?: string }>;
 }
 
 function baseUrl(): string {
@@ -41,6 +47,69 @@ class UazApiProvider implements WhatsAppProvider {
       const body = await res.text().catch(() => "");
       throw new Error(`UazAPI /send/text falhou (${res.status}): ${body.slice(0, 300)}`);
     }
+  }
+
+  async createInstance(name: string): Promise<string> {
+    if (!env.UAZAPI_ADMIN_TOKEN) {
+      throw new Error("UAZAPI_ADMIN_TOKEN não configurado no servidor");
+    }
+    const res = await fetch(`${baseUrl()}/instance/init`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        admintoken: env.UAZAPI_ADMIN_TOKEN,
+      },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await res.json().catch(() => ({}))) as any;
+    if (!res.ok) {
+      throw new Error(
+        `UazAPI /instance/init falhou (${res.status}): ${JSON.stringify(data).slice(0, 300)}`,
+      );
+    }
+    const token: string | undefined =
+      data?.token ?? data?.instance?.token ?? data?.instance?.apikey;
+    if (!token) {
+      throw new Error(`UazAPI /instance/init não retornou token: ${JSON.stringify(data).slice(0, 300)}`);
+    }
+    return token;
+  }
+
+  async configureWebhook(tenant: Tenant, url: string): Promise<void> {
+    const body = JSON.stringify({
+      enabled: true,
+      url,
+      events: ["messages"],
+      excludeMessages: ["wasSentByApi"],
+    });
+    const headers = { "Content-Type": "application/json", token: tenantToken(tenant) };
+
+    // O verbo varia entre versões da UazAPI — tenta POST e cai pra PUT
+    let res = await fetch(`${baseUrl()}/webhook`, { method: "POST", headers, body });
+    if (!res.ok && res.status !== 200) {
+      res = await fetch(`${baseUrl()}/webhook`, { method: "PUT", headers, body });
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`UazAPI /webhook falhou (${res.status}): ${text.slice(0, 300)}`);
+    }
+  }
+
+  async connect(tenant: Tenant): Promise<{ qrcode?: string }> {
+    const res = await fetch(`${baseUrl()}/instance/connect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: tenantToken(tenant) },
+      body: JSON.stringify({}),
+    });
+    const data = (await res.json().catch(() => ({}))) as any;
+    if (!res.ok) {
+      throw new Error(
+        `UazAPI /instance/connect falhou (${res.status}): ${JSON.stringify(data).slice(0, 300)}`,
+      );
+    }
+    const qrcode: string | undefined =
+      data?.instance?.qrcode ?? data?.qrcode ?? undefined;
+    return { qrcode };
   }
 
   async disconnect(tenant: Tenant): Promise<void> {
@@ -78,6 +147,13 @@ class NoopProvider implements WhatsAppProvider {
     return { connected: false };
   }
   async disconnect(): Promise<void> {}
+  async createInstance(): Promise<string> {
+    throw new Error("UAZAPI_BASE_URL não configurada no servidor");
+  }
+  async configureWebhook(): Promise<void> {}
+  async connect(): Promise<{ qrcode?: string }> {
+    throw new Error("UAZAPI_BASE_URL não configurada no servidor");
+  }
 }
 
 export const whatsapp: WhatsAppProvider = env.UAZAPI_BASE_URL

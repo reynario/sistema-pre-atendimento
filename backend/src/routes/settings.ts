@@ -64,6 +64,53 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
   });
 
+  // Conexão em 1 clique: cria a instância na UazAPI (se ainda não existir),
+  // configura o webhook automaticamente e inicia o pareamento (QR code).
+  // O frontend segue consultando /settings/whatsapp-status até conectar.
+  app.post("/settings/whatsapp-connect", async (req, reply) => {
+    let tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { id: req.user.tenantId },
+    });
+
+    if (!env.UAZAPI_BASE_URL) {
+      return reply.code(400).send({
+        error: "UazAPI não configurada no servidor (UAZAPI_BASE_URL)",
+      });
+    }
+
+    // 1. Garante uma instância própria da clínica
+    if (!tenant.uazapiToken) {
+      if (!env.UAZAPI_ADMIN_TOKEN) {
+        return reply.code(400).send({
+          error:
+            "Criação automática indisponível (UAZAPI_ADMIN_TOKEN não configurado). Cole o token da instância manualmente.",
+          manualRequired: true,
+        });
+      }
+      const instanceName = `${tenant.slug}-${tenant.id.slice(-6)}`;
+      const token = await whatsapp.createInstance(instanceName);
+      tenant = await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { uazapiToken: token },
+      });
+    }
+
+    // 2. Configura o webhook (best-effort: se falhar, o botão ainda mostra o
+    // QR e o admin vê o motivo no log — dá pra configurar na mão na UazAPI)
+    const webhookUrl = `${env.PUBLIC_URL}/webhooks/uazapi/${tenant.webhookToken}`;
+    let webhookOk = true;
+    try {
+      await whatsapp.configureWebhook(tenant, webhookUrl);
+    } catch (err: any) {
+      webhookOk = false;
+      req.log.warn({ err: err?.message }, "falha ao configurar webhook na UazAPI");
+    }
+
+    // 3. Inicia o pareamento
+    const { qrcode } = await whatsapp.connect(tenant);
+    return { ok: true, qrcode: qrcode ?? null, webhookConfigured: webhookOk, webhookUrl };
+  });
+
   // Desconecta o WhatsApp da clínica (troca de número): encerra a sessão na
   // UazAPI (melhor esforço) e limpa o token — a IA para de atender na hora.
   app.post("/settings/whatsapp-disconnect", async (req) => {
