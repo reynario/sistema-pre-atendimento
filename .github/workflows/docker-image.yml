@@ -20,6 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Testes do backend (motor de horários)
+        working-directory: backend
+        run: |
+          npm ci
+          npm test
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Login no GHCR

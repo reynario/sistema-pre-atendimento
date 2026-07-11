@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { ZodError } from "zod";
 import { env } from "./env.js";
 import { registerAuth } from "./plugins/auth.js";
@@ -24,6 +25,14 @@ export async function buildServer() {
   await app.register(cors, {
     origin: [env.FRONTEND_ORIGIN, "http://localhost:5173"],
     credentials: true,
+  });
+
+  // Limite global por IP (o Traefik repassa o IP real em x-forwarded-for)
+  await app.register(rateLimit, {
+    max: 300,
+    timeWindow: "1 minute",
+    keyGenerator: (req) =>
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.ip,
   });
 
   await registerAuth(app);

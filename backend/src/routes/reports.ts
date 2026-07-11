@@ -1,6 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 
+// Preço por 1M de tokens (US$) — atualizar se trocar de modelo
+const MODEL_PRICES: Record<string, { input: number; output: number }> = {
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1": { input: 2, output: 8 },
+};
+
+function estimateCostUsd(rows: { model: string; inputTokens: number; outputTokens: number }[]) {
+  let usd = 0;
+  for (const r of rows) {
+    const price = MODEL_PRICES[r.model];
+    if (!price) continue;
+    usd += (r.inputTokens / 1_000_000) * price.input + (r.outputTokens / 1_000_000) * price.output;
+  }
+  return usd;
+}
+
 /**
  * Relatórios do período: funil, conversão, no-show, série diária de leads e
  * agendamentos, ranking de serviços e atividade da IA.
@@ -55,6 +73,16 @@ export async function reportRoutes(app: FastifyInstance) {
       }),
     ]);
 
+    const aiUsageRows = await prisma.aiUsage.findMany({
+      where: { tenantId, createdAt: { gte: since } },
+      select: { model: true, inputTokens: true, outputTokens: true },
+    });
+    const aiTokens = aiUsageRows.reduce(
+      (acc, r) => ({ input: acc.input + r.inputTokens, output: acc.output + r.outputTokens }),
+      { input: 0, output: 0 },
+    );
+    const aiCostUsd = estimateCostUsd(aiUsageRows);
+
     // Série diária (leads novos e agendamentos criados)
     const byDay: { date: string; leads: number; appointments: number }[] = [];
     for (let i = 0; i < days; i++) {
@@ -98,6 +126,8 @@ export async function reportRoutes(app: FastifyInstance) {
         noShowRate: done + missed > 0 ? missed / (done + missed) : null,
         aiMessages,
         escalations,
+        aiTokens,
+        aiCostUsd,
       },
       funnel: Object.fromEntries(funnelGroups.map((g) => [g.status, g._count])),
       byDay,

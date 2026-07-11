@@ -1,19 +1,8 @@
 import { prisma } from "../db.js";
 import { Prisma } from "@prisma/client";
+import { computeFreeSlots, type FreeSlot } from "./slots-engine.js";
 
-const SLOT_STEP_MIN = 15;
-
-/** "08:00" -> minutos desde 00:00 */
-function toMin(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart < bEnd && bStart < aEnd;
-}
-
-export type FreeSlot = { startsAt: string; endsAt: string };
+export type { FreeSlot };
 
 /**
  * Calcula horários livres de um dia para um serviço (e opcionalmente um
@@ -88,28 +77,13 @@ export async function getFreeSlots(params: {
     }),
   ]);
 
-  const busy = [...appointments, ...blocks];
-  const minStart = new Date(Date.now() + tenant.minAdvanceMinutes * 60 * 1000);
-  const slots: FreeSlot[] = [];
-  const seen = new Set<string>();
-
-  for (const rule of rules) {
-    const ruleStart = toMin(rule.startTime);
-    const ruleEnd = toMin(rule.endTime);
-    for (let m = ruleStart; m + service.durationMin <= ruleEnd; m += SLOT_STEP_MIN) {
-      const start = new Date(dayStart.getTime() + m * 60 * 1000);
-      const end = new Date(start.getTime() + service.durationMin * 60 * 1000);
-      if (start < minStart) continue;
-      if (busy.some((b) => overlaps(start, end, b.startsAt, b.endsAt))) continue;
-      const key = start.toISOString();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      slots.push({ startsAt: key, endsAt: end.toISOString() });
-    }
-  }
-
-  slots.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  return slots;
+  return computeFreeSlots({
+    dayStart,
+    rules,
+    busy: [...appointments, ...blocks],
+    durationMin: service.durationMin,
+    minStart: new Date(Date.now() + tenant.minAdvanceMinutes * 60 * 1000),
+  });
 }
 
 /**

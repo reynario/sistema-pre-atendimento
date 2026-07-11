@@ -29,7 +29,9 @@ function slugify(name: string): string {
 }
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post("/auth/register", async (req, reply) => {
+  app.post("/auth/register", {
+    config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+  }, async (req, reply) => {
     const body = registerSchema.parse(req.body);
 
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
@@ -78,7 +80,9 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(201).send({ token, user: { name: user.name, email: user.email } });
   });
 
-  app.post("/auth/login", async (req, reply) => {
+  app.post("/auth/login", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  }, async (req, reply) => {
     const body = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     if (!user || !(await bcrypt.compare(body.password, user.passwordHash))) {

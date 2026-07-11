@@ -11,6 +11,8 @@ type Report = {
     noShowRate: number | null;
     aiMessages: number;
     escalations: number;
+    aiTokens: { input: number; output: number };
+    aiCostUsd: number;
   };
   funnel: Record<string, number>;
   byDay: { date: string; leads: number; appointments: number }[];
@@ -80,6 +82,11 @@ export default function Reports() {
             />
             <Stat label="Respostas da IA" value={String(data.stats.aiMessages)} />
             <Stat label="Escalações p/ humano" value={String(data.stats.escalations)} />
+            <Stat
+              label="Custo de IA no período"
+              value={`US$ ${data.stats.aiCostUsd.toFixed(2)}`}
+              hint={`${((data.stats.aiTokens.input + data.stats.aiTokens.output) / 1000).toFixed(0)}k tokens`}
+            />
           </div>
 
           <DailyChart title="Leads novos por dia" data={data.byDay} field="leads" />

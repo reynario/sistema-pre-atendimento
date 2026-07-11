@@ -384,6 +384,24 @@ export async function runSdr(params: {
     ...params.history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  // Consumo de tokens do turno inteiro (todas as iterações do loop)
+  let usedInput = 0;
+  let usedOutput = 0;
+  const recordUsage = async () => {
+    if (usedInput + usedOutput === 0) return;
+    await prisma.aiUsage
+      .create({
+        data: {
+          tenantId: tenant.id,
+          model: env.OPENAI_MODEL,
+          inputTokens: usedInput,
+          outputTokens: usedOutput,
+          source: dryRun ? "playground" : "whatsapp",
+        },
+      })
+      .catch(() => {});
+  };
+
   // Loop agentico com limite de iterações
   for (let i = 0; i < 6; i++) {
     const completion = await client.chat.completions.create({
@@ -393,12 +411,16 @@ export async function runSdr(params: {
       tools,
     });
 
+    usedInput += completion.usage?.prompt_tokens ?? 0;
+    usedOutput += completion.usage?.completion_tokens ?? 0;
+
     const choice = completion.choices[0];
     const message = choice?.message;
     if (!message) {
       result.reply = null;
       result.escalated = true;
       result.escalationReason = "IA não retornou resposta";
+      await recordUsage();
       return result;
     }
 
@@ -406,12 +428,14 @@ export async function runSdr(params: {
       result.reply = null;
       result.escalated = true;
       result.escalationReason = "IA recusou a solicitação (política de segurança)";
+      await recordUsage();
       return result;
     }
 
     const toolCalls = message.tool_calls ?? [];
     if (toolCalls.length === 0) {
       result.reply = message.content?.trim() || null;
+      await recordUsage();
       return result;
     }
 
@@ -435,5 +459,6 @@ export async function runSdr(params: {
     "Só um instante, vou confirmar essa informação com a equipe e já te retorno! 😊";
   result.escalated = true;
   result.escalationReason = "IA excedeu o limite de passos do turno";
+  await recordUsage();
   return result;
 }
