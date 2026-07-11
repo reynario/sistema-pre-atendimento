@@ -63,7 +63,24 @@ export default function MinhaIA() {
       <section className="card space-y-3">
         <h2 className="text-sm font-bold">Conexão com o WhatsApp (UazAPI)</h2>
         {waStatus?.connected ? (
-          <p className="text-sm text-pine-strong">● Conectado — a IA está atendendo seu número.</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-pine-strong">● Conectado — a IA está atendendo seu número.</p>
+            <button
+              className="chip flex-none border border-brick/30 text-brick"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    "Desconectar o WhatsApp? A IA para de atender na hora. Use isso para trocar de número — depois é só colar o token da nova instância e escanear o QR de novo.",
+                  )
+                )
+                  return;
+                await api("/settings/whatsapp-disconnect", { method: "POST" });
+                load();
+              }}
+            >
+              Desconectar / trocar número
+            </button>
+          </div>
         ) : (
           <>
             <p className="text-sm text-ink-muted">

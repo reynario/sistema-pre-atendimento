@@ -64,6 +64,24 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
   });
 
+  // Desconecta o WhatsApp da clínica (troca de número): encerra a sessão na
+  // UazAPI (melhor esforço) e limpa o token — a IA para de atender na hora.
+  app.post("/settings/whatsapp-disconnect", async (req) => {
+    const tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { id: req.user.tenantId },
+    });
+    if (tenant.uazapiToken) {
+      await whatsapp.disconnect(tenant).catch((err) => {
+        req.log.warn({ err: err?.message }, "falha ao desconectar instância na UazAPI");
+      });
+    }
+    await prisma.tenant.update({
+      where: { id: tenant.id },
+      data: { uazapiToken: null, whatsappNumber: null },
+    });
+    return { ok: true };
+  });
+
   // Trocar plano (billing automatizado fica pra Fase 2 — aqui só registra a escolha)
   app.patch("/settings/plan", async (req) => {
     const body = z

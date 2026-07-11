@@ -21,7 +21,12 @@ export default function More() {
     <div>
       <PageHeader title={me?.tenant.name ?? "Mais"} subtitle={me?.user.email} />
       <div className="space-y-2">
-        {ITEMS.filter((i) => isOwner || !i.ownerOnly).map((i) => (
+        {[
+          ...ITEMS,
+          ...(me?.user.isAdmin
+            ? [{ to: "/admin", label: "⚙ Admin da plataforma", desc: "Clientes, aprovações, receita e cupons" }]
+            : []),
+        ].filter((i: any) => isOwner || !i.ownerOnly).map((i) => (
           <Link key={i.to} to={i.to} className="card flex items-center justify-between py-3.5 transition hover:border-pine/40">
             <div>
               <div className="text-sm font-semibold">{i.label}</div>

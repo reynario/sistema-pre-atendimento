@@ -32,6 +32,8 @@ services:
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"
       VAPID_SUBJECT: "${VAPID_SUBJECT:-mailto:rndigitalmidia@gmail.com}"
+      # E-mails com acesso ao painel /admin da plataforma
+      ADMIN_EMAILS: "${ADMIN_EMAILS:-rndigitalmidia@gmail.com}"
       TZ: "America/Sao_Paulo"
 
     networks:

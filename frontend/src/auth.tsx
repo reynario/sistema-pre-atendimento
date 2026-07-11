@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { api, getToken, setToken } from "./api";
 
 export type Me = {
-  user: { name: string; email: string; role: string };
+  user: { name: string; email: string; role: string; isAdmin: boolean };
   tenant: {
     name: string;
     slug: string;
     planCycle: string;
     subscriptionStatus: string;
+    approvalStatus: string;
     subscriptionActive: boolean;
     trialEndsAt: string | null;
     whatsappConnected: boolean;

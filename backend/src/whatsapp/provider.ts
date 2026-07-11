@@ -10,6 +10,8 @@ export interface WhatsAppProvider {
   sendText(tenant: Tenant, phone: string, text: string): Promise<void>;
   /** Status da conexão da instância + QR code quando desconectada. */
   getStatus(tenant: Tenant): Promise<{ connected: boolean; qrcode?: string }>;
+  /** Desconecta a sessão do WhatsApp na instância (para trocar de número). */
+  disconnect(tenant: Tenant): Promise<void>;
 }
 
 function baseUrl(): string {
@@ -41,6 +43,17 @@ class UazApiProvider implements WhatsAppProvider {
     }
   }
 
+  async disconnect(tenant: Tenant): Promise<void> {
+    const res = await fetch(`${baseUrl()}/instance/disconnect`, {
+      method: "POST",
+      headers: { token: tenantToken(tenant) },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`UazAPI /instance/disconnect falhou (${res.status}): ${body.slice(0, 200)}`);
+    }
+  }
+
   async getStatus(tenant: Tenant): Promise<{ connected: boolean; qrcode?: string }> {
     const res = await fetch(`${baseUrl()}/instance/status`, {
       headers: { token: tenantToken(tenant) },
@@ -64,6 +77,7 @@ class NoopProvider implements WhatsAppProvider {
   async getStatus(): Promise<{ connected: boolean }> {
     return { connected: false };
   }
+  async disconnect(): Promise<void> {}
 }
 
 export const whatsapp: WhatsAppProvider = env.UAZAPI_BASE_URL

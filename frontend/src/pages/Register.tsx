@@ -15,6 +15,7 @@ export default function Register() {
   const nav = useNavigate();
   const { refresh } = useAuth();
   const [form, setForm] = useState({ clinicName: "", userName: "", email: "", password: "" });
+  const [coupon, setCoupon] = useState("");
   const [plan, setPlan] = useState<string>("TRIMESTRAL");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +30,7 @@ export default function Register() {
     try {
       const { token } = await api<{ token: string }>("/auth/register", {
         method: "POST",
-        body: { ...form, planCycle: plan },
+        body: { ...form, planCycle: plan, couponCode: coupon.trim() || undefined },
       });
       setToken(token);
       await refresh();
@@ -93,6 +94,16 @@ export default function Register() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="label">Cupom (opcional)</label>
+            <input
+              className="input uppercase"
+              value={coupon}
+              onChange={(e) => setCoupon(e.target.value)}
+              placeholder="Tem um cupom? Digite aqui"
+            />
           </div>
 
           {error && <p className="text-sm font-semibold text-brick">{error}</p>}

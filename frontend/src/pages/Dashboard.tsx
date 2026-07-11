@@ -13,7 +13,28 @@ type Data = {
 function TrialBanner() {
   const { me } = useAuth();
   if (!me) return null;
-  const { subscriptionStatus, subscriptionActive, trialEndsAt } = me.tenant;
+  const { subscriptionStatus, subscriptionActive, trialEndsAt, approvalStatus } = me.tenant;
+
+  // Cadastro em análise: banner informativo (sem tom de cobrança)
+  if (approvalStatus === "PENDENTE") {
+    return (
+      <div className="card border-marigold bg-marigold-tint/60 text-sm">
+        <strong className="text-marigold">Cadastro em análise.</strong>{" "}
+        <span className="text-ink-muted">
+          Você já pode configurar tudo e testar a IA no playground — o atendimento no WhatsApp é
+          liberado assim que aprovarmos seu cadastro (em até 1 dia útil).
+        </span>
+      </div>
+    );
+  }
+  if (approvalStatus === "RECUSADO") {
+    return (
+      <div className="card border-brick bg-brick-tint/60 text-sm">
+        <strong className="text-brick">Cadastro não aprovado.</strong>{" "}
+        <span className="text-ink-muted">Entre em contato com o suporte para mais detalhes.</span>
+      </div>
+    );
+  }
 
   // Assinatura paga em dia: nada a mostrar
   if (subscriptionStatus === "ATIVA") return null;

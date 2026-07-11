@@ -61,6 +61,12 @@ enum SubscriptionStatus {
   CANCELADA
 }
 
+enum ApprovalStatus {
+  PENDENTE
+  APROVADO
+  RECUSADO
+}
+
 enum JobStatus {
   PENDENTE
   ENVIADO
@@ -104,6 +110,10 @@ model Tenant {
   planCycle          PlanCycle          @default(MENSAL)
   subscriptionStatus SubscriptionStatus @default(TRIAL)
   trialEndsAt        DateTime?
+  // Aprovação manual de cadastros (default APROVADO preserva clínicas
+  // existentes; cadastros novos entram explicitamente como PENDENTE)
+  approvalStatus     ApprovalStatus     @default(APROVADO)
+  couponCode         String?
 
   createdAt DateTime @default(now())
 
@@ -303,6 +313,21 @@ model FollowUp {
   createdAt    DateTime  @default(now())
 
   @@index([tenantId, status])
+}
+
+// Cupons de desconto/trial estendido (aplicados no cadastro; o desconto em
+// % fica registrado para o billing usar quando o Asaas entrar)
+model Coupon {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  description     String?
+  discountPercent Int       @default(0)
+  extraTrialDays  Int       @default(0)
+  maxUses         Int?
+  usedCount       Int       @default(0)
+  expiresAt       DateTime?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
 }
 
 // Registro de consumo da IA por turno de conversa — base do custo por clínica

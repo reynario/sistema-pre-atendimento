@@ -75,6 +75,7 @@ export default function Layout() {
             : []),
           { to: "/notificacoes", label: `Notificações${unread ? ` (${unread})` : ""}` },
           ...(me?.user.role === "OWNER" ? [{ to: "/plano", label: "Plano" }] : []),
+          ...(me?.user.isAdmin ? [{ to: "/admin", label: "⚙ Admin" }] : []),
         ].map((n) => (
           <NavLink
             key={n.to}

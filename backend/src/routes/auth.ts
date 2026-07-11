@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { prisma } from "../db.js";
 import { env } from "../env.js";
 import { isSubscriptionActive } from "../core/subscription.js";
+import { isAdminEmail } from "../plugins/auth.js";
 
 const registerSchema = z.object({
   clinicName: z.string().min(2),
@@ -12,6 +13,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   planCycle: z.enum(["MENSAL", "TRIMESTRAL", "ANUAL"]).default("MENSAL"),
+  couponCode: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -42,6 +44,24 @@ export async function authRoutes(app: FastifyInstance) {
       slug = `${slug}-${crypto.randomBytes(2).toString("hex")}`;
     }
 
+    // Cupom (opcional): valida e registra; dias extras entram na aprovação
+    let coupon = null;
+    if (body.couponCode) {
+      coupon = await prisma.coupon.findUnique({
+        where: { code: body.couponCode.trim().toUpperCase() },
+      });
+      const valid =
+        coupon &&
+        coupon.active &&
+        (!coupon.expiresAt || coupon.expiresAt > new Date()) &&
+        (coupon.maxUses === null || coupon.usedCount < coupon.maxUses);
+      if (!valid) return reply.code(400).send({ error: "Cupom inválido ou expirado" });
+      await prisma.coupon.update({
+        where: { id: coupon!.id },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
     const tenant = await prisma.tenant.create({
@@ -52,6 +72,9 @@ export async function authRoutes(app: FastifyInstance) {
         planCycle: body.planCycle,
         subscriptionStatus: "TRIAL",
         trialEndsAt,
+        // Cadastros novos passam por aprovação manual do admin
+        approvalStatus: "PENDENTE",
+        couponCode: coupon?.code ?? null,
         // Disponibilidade padrão: seg a sex, 09h às 18h (ajustável no painel)
         availabilityRules: {
           create: [1, 2, 3, 4, 5].map((weekday) => ({
@@ -99,12 +122,18 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user.userId } });
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: req.user.tenantId } });
     return {
-      user: { name: user.name, email: user.email, role: user.role },
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isAdmin: isAdminEmail(user.email),
+      },
       tenant: {
         name: tenant.name,
         slug: tenant.slug,
         planCycle: tenant.planCycle,
         subscriptionStatus: tenant.subscriptionStatus,
+        approvalStatus: tenant.approvalStatus,
         subscriptionActive: isSubscriptionActive(tenant),
         trialEndsAt: tenant.trialEndsAt,
         whatsappConnected: Boolean(tenant.uazapiToken),

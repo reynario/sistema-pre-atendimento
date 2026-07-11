@@ -8,6 +8,8 @@ import { notify } from "./notify.js";
  * (lembretes de consultas já marcadas continuam saindo).
  */
 export function isSubscriptionActive(tenant: Tenant): boolean {
+  // Cadastro ainda não aprovado (ou recusado): IA não atende
+  if (tenant.approvalStatus !== "APROVADO") return false;
   if (tenant.subscriptionStatus === "ATIVA") return true;
   if (tenant.subscriptionStatus === "TRIAL") {
     return !!tenant.trialEndsAt && tenant.trialEndsAt.getTime() > Date.now();

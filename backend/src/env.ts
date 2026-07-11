@@ -21,4 +21,9 @@ export const env = {
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY ?? "",
   VAPID_SUBJECT: process.env.VAPID_SUBJECT ?? "mailto:contato@example.com",
   FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+  // E-mails (separados por vírgula) com acesso ao painel de admin da plataforma
+  ADMIN_EMAILS: (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
 };

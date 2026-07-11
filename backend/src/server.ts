@@ -16,6 +16,7 @@ import { reportRoutes } from "./routes/reports.js";
 import { teamRoutes } from "./routes/team.js";
 import { pushRoutes } from "./routes/push.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
+import { adminRoutes } from "./routes/admin.js";
 import { playgroundRoutes } from "./routes/playground.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 
@@ -62,6 +63,7 @@ export async function buildServer() {
   await app.register(teamRoutes);
   await app.register(pushRoutes);
   await app.register(waitlistRoutes);
+  await app.register(adminRoutes);
   await app.register(playgroundRoutes);
   await app.register(webhookRoutes);
 
