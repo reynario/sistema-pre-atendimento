@@ -14,6 +14,9 @@ import Playground from "./pages/Playground";
 import Notifications from "./pages/Notifications";
 import Plan from "./pages/Plan";
 import More from "./pages/More";
+import Horarios from "./pages/Horarios";
+import Reports from "./pages/Reports";
+import Onboarding from "./pages/Onboarding";
 import { Spinner } from "./components/ui";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -31,6 +34,14 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Register />} />
           <Route
+            path="/bem-vindo"
+            element={
+              <Protected>
+                <Onboarding />
+              </Protected>
+            }
+          />
+          <Route
             element={
               <Protected>
                 <Layout />
@@ -43,6 +54,8 @@ export default function App() {
             <Route path="/leads" element={<Leads />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/servicos" element={<Services />} />
+            <Route path="/horarios" element={<Horarios />} />
+            <Route path="/relatorios" element={<Reports />} />
             <Route path="/minha-ia" element={<MinhaIA />} />
             <Route path="/playground" element={<Playground />} />
             <Route path="/notificacoes" element={<Notifications />} />

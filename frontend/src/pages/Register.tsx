@@ -33,7 +33,7 @@ export default function Register() {
       });
       setToken(token);
       await refresh();
-      nav("/minha-ia");
+      nav("/bem-vindo");
     } catch (err: any) {
       setError(err.message ?? "Erro ao cadastrar");
     } finally {

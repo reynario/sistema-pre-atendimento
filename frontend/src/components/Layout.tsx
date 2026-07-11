@@ -64,6 +64,8 @@ export default function Layout() {
         <div className="my-2 border-t border-ink/10" />
         {[
           { to: "/servicos", label: "Serviços" },
+          { to: "/horarios", label: "Horários" },
+          { to: "/relatorios", label: "Relatórios" },
           { to: "/minha-ia", label: "Minha IA" },
           { to: "/notificacoes", label: `Notificações${unread ? ` (${unread})` : ""}` },
           { to: "/plano", label: "Plano" },

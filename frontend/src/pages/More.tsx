@@ -4,6 +4,8 @@ import { PageHeader } from "../components/ui";
 
 const ITEMS = [
   { to: "/servicos", label: "Serviços e preços", desc: "O que a IA oferece e agenda" },
+  { to: "/horarios", label: "Horários e bloqueios", desc: "Quando a IA pode agendar; folgas e feriados" },
+  { to: "/relatorios", label: "Relatórios", desc: "Conversão, no-show e leads por período" },
   { to: "/minha-ia", label: "Minha IA", desc: "Conexão WhatsApp, follow-up, base de conhecimento" },
   { to: "/playground", label: "Testar minha IA", desc: "Converse com sua atendente antes de ativar" },
   { to: "/notificacoes", label: "Notificações", desc: "Avisos de agendamentos e escalações" },
