@@ -5,6 +5,7 @@ import { env } from "../env.js";
 import { getFreeSlots, createAppointmentSafe } from "../core/slots.js";
 import { scheduleReminders, cancelReminders } from "../core/reminders.js";
 import { notify } from "../core/notify.js";
+import { jobsQueue } from "../queues.js";
 
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY || "nao-configurada" });
 
@@ -100,6 +101,22 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: "object",
         properties: { motivo: { type: "string" } },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "entrar_lista_espera",
+      description:
+        "Coloca o lead na lista de espera quando nenhum horário disponível serve pra ele. Se um horário vagar, ele é avisado automaticamente.",
+      parameters: {
+        type: "object",
+        properties: {
+          servico_id: { type: "string", description: "ID do serviço desejado, se souber" },
+          observacao: { type: "string", description: "Preferência do lead (ex: 'só de manhã')" },
+        },
         required: [],
       },
     },
@@ -234,6 +251,12 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         await prisma.appointment.update({ where: { id: appt.id }, data: { status: "CANCELADO" } });
         await prisma.contact.update({ where: { id: contact.id }, data: { status: "CONVERSANDO" } });
         await cancelReminders(appt.id);
+        // Horário vagou: aciona a lista de espera
+        await jobsQueue.add("process-waitlist", {
+          kind: "process-waitlist",
+          tenantId: tenant.id,
+          appointmentId: appt.id,
+        });
         await notify(
           tenant.id,
           "CANCELAMENTO",
@@ -245,6 +268,33 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         ctx.result.sandboxNotes.push("Cancelamento simulado (modo teste).");
       }
       return `OK: agendamento de ${appt.service.name} em ${fmtDateTime(appt.startsAt)} cancelado. Ofereça um reagendamento.`;
+    }
+
+    case "entrar_lista_espera": {
+      if (dryRun) {
+        ctx.result.sandboxNotes.push("Entrada na lista de espera simulada (modo teste).");
+        return "SIMULADO: lead adicionado à lista de espera.";
+      }
+      const existing = await prisma.waitlistEntry.findFirst({
+        where: { tenantId: tenant.id, contactId: contact.id, status: "PENDENTE" },
+      });
+      if (existing) return "Este lead já está na lista de espera.";
+      await prisma.waitlistEntry.create({
+        data: {
+          tenantId: tenant.id,
+          contactId: contact.id,
+          serviceId: input?.servico_id ? String(input.servico_id) : null,
+          notes: input?.observacao ? String(input.observacao) : null,
+        },
+      });
+      await notify(
+        tenant.id,
+        "AGENDAMENTO",
+        "Lead na lista de espera",
+        `${contact.name ?? contact.phone} entrou na lista de espera` +
+          (input?.observacao ? ` (${input.observacao})` : "") + ".",
+      );
+      return "OK: lead adicionado à lista de espera. Avise que ele será chamado assim que vagar um horário.";
     }
 
     case "escalar_para_humano": {
@@ -297,6 +347,7 @@ Regras obrigatórias:
 - NUNCA invente preços, serviços ou horários. Use as ferramentas listar_servicos e horarios_disponiveis.
 - Só crie um agendamento depois que o lead confirmar explicitamente um horário específico.
 - Ofereça no máximo 3 opções de horário por vez.
+- Se nenhum horário disponível servir para o lead, ofereça colocá-lo na lista de espera (entrar_lista_espera) — ele será avisado quando vagar.
 - Se o lead pedir para falar com uma pessoa, reclamar, ou você não souber responder com segurança, use escalar_para_humano.
 - Se o lead disser que não quer mais receber mensagens, respeite, despeça-se educadamente e use escalar_para_humano com motivo "opt-out".
 - Peça o nome do lead de forma natural durante a conversa, se ainda não souber.

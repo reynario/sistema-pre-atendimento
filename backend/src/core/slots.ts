@@ -44,15 +44,24 @@ export async function getFreeSlots(params: {
   // Se o serviço tem profissional fixo, ele prevalece
   const effectiveProfessionalId = professionalId ?? service.professionalId ?? null;
 
-  const rules = await prisma.availabilityRule.findMany({
-    where: {
-      tenantId,
-      weekday,
-      OR: effectiveProfessionalId
-        ? [{ professionalId: effectiveProfessionalId }, { professionalId: null }]
-        : [{}],
-    },
-  });
+  // Grade do profissional prevalece; sem grade própria, vale a grade geral
+  let rules = effectiveProfessionalId
+    ? await prisma.availabilityRule.findMany({
+        where: { tenantId, weekday, professionalId: effectiveProfessionalId },
+      })
+    : [];
+  if (rules.length === 0) {
+    const hasOwnGrid = effectiveProfessionalId
+      ? (await prisma.availabilityRule.count({
+          where: { tenantId, professionalId: effectiveProfessionalId },
+        })) > 0
+      : false;
+    if (!hasOwnGrid) {
+      rules = await prisma.availabilityRule.findMany({
+        where: { tenantId, weekday, professionalId: null },
+      });
+    }
+  }
   if (rules.length === 0) return [];
 
   const [appointments, blocks] = await Promise.all([

@@ -66,9 +66,15 @@ export default function Layout() {
           { to: "/servicos", label: "Serviços" },
           { to: "/horarios", label: "Horários" },
           { to: "/relatorios", label: "Relatórios" },
-          { to: "/minha-ia", label: "Minha IA" },
+          // Configurações, equipe e plano são do dono
+          ...(me?.user.role === "OWNER"
+            ? [
+                { to: "/minha-ia", label: "Minha IA" },
+                { to: "/equipe", label: "Equipe" },
+              ]
+            : []),
           { to: "/notificacoes", label: `Notificações${unread ? ` (${unread})` : ""}` },
-          { to: "/plano", label: "Plano" },
+          ...(me?.user.role === "OWNER" ? [{ to: "/plano", label: "Plano" }] : []),
         ].map((n) => (
           <NavLink
             key={n.to}

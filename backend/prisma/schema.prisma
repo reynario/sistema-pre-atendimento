@@ -89,6 +89,10 @@ model Tenant {
   followUpEnabled Boolean @default(true)
   followUpHours   Int     @default(4)
 
+  // Pós-consulta (agradecimento + avaliação no Google)
+  postVisitEnabled Boolean @default(true)
+  googleReviewUrl  String?
+
   // Lembretes de consulta (horas antes; o segundo é opcional)
   reminderHours1 Int  @default(24)
   reminderHours2 Int? @default(2)
@@ -104,6 +108,9 @@ model Tenant {
   createdAt DateTime @default(now())
 
   users             User[]
+  invites           Invite[]
+  pushSubscriptions PushSubscription[]
+  waitlistEntries   WaitlistEntry[]
   contacts          Contact[]
   conversations     Conversation[]
   messages          Message[]
@@ -141,9 +148,10 @@ model Contact {
   optOut     Boolean       @default(false)
   createdAt  DateTime      @default(now())
 
-  conversation Conversation?
-  appointments Appointment[]
-  followUps    FollowUp[]
+  conversation    Conversation?
+  appointments    Appointment[]
+  followUps       FollowUp[]
+  waitlistEntries WaitlistEntry[]
 
   @@unique([tenantId, phone])
   @@index([tenantId, status])
@@ -203,7 +211,8 @@ model Service {
   professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
   active         Boolean       @default(true)
 
-  appointments Appointment[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([tenantId])
 }
@@ -249,6 +258,7 @@ model Appointment {
   status         AppointmentStatus @default(AGENDADO)
   createdBy      String            @default("HUMANO") // "IA" | "HUMANO"
   notes          String?
+  postVisitSentAt DateTime?
   createdAt      DateTime          @default(now())
 
   reminders Reminder[]
@@ -290,6 +300,54 @@ model FollowUp {
   status       JobStatus @default(PENDENTE)
   attempt      Int       @default(1)
   createdAt    DateTime  @default(now())
+
+  @@index([tenantId, status])
+}
+
+model Invite {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  role      UserRole  @default(STAFF)
+  label     String? // pra quem é o convite (ex: "Recepção manhã")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+enum WaitlistStatus {
+  PENDENTE
+  AVISADO
+  RESOLVIDO
+}
+
+model WaitlistEntry {
+  id        String         @id @default(cuid())
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  notes     String?
+  status    WaitlistStatus @default(PENDENTE)
+  createdAt DateTime       @default(now())
 
   @@index([tenantId, status])
 }

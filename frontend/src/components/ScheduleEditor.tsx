@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 
-type Rule = { weekday: number; startTime: string; endTime: string };
+type Rule = { weekday: number; startTime: string; endTime: string; professionalId?: string | null };
 
 const WEEKDAYS = [
   { n: 1, label: "Segunda" },
@@ -17,26 +17,35 @@ type DayState = { open: boolean; startTime: string; endTime: string };
 
 /**
  * Editor semanal de horários de atendimento (uma janela por dia).
- * É a fonte que a IA consulta pra oferecer horários — salvar aqui muda
- * imediatamente o que ela oferece no WhatsApp.
+ * Sem professionalId edita a grade geral; com professionalId edita a grade
+ * daquele profissional (que substitui a geral pra ele).
+ * É a fonte que a IA consulta pra oferecer horários.
  */
-export default function ScheduleEditor({ onSaved }: { onSaved?: () => void }) {
+export default function ScheduleEditor({
+  professionalId = null,
+  onSaved,
+}: {
+  professionalId?: string | null;
+  onSaved?: () => void;
+}) {
   const [days, setDays] = useState<Record<number, DayState> | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setDays(null);
     void api<Rule[]>("/availability-rules").then((rules) => {
+      const scoped = rules.filter((r) => (r.professionalId ?? null) === professionalId);
       const state: Record<number, DayState> = {};
       for (const { n } of WEEKDAYS) {
-        const rule = rules.find((r) => r.weekday === n);
+        const rule = scoped.find((r) => r.weekday === n);
         state[n] = rule
           ? { open: true, startTime: rule.startTime, endTime: rule.endTime }
           : { open: false, startTime: "09:00", endTime: "18:00" };
       }
       setDays(state);
     });
-  }, []);
+  }, [professionalId]);
 
   if (!days) return <p className="py-4 text-sm text-ink-muted">Carregando horários…</p>;
 
@@ -51,7 +60,7 @@ export default function ScheduleEditor({ onSaved }: { onSaved?: () => void }) {
         startTime: days[n].startTime,
         endTime: days[n].endTime,
       }));
-      await api("/availability-rules", { method: "PUT", body: { rules } });
+      await api("/availability-rules", { method: "PUT", body: { rules, professionalId } });
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
       onSaved?.();

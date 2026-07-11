@@ -16,5 +16,9 @@ export const env = {
   OPENAI_MODEL: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
   UAZAPI_BASE_URL: process.env.UAZAPI_BASE_URL ?? "",
   UAZAPI_ADMIN_TOKEN: process.env.UAZAPI_ADMIN_TOKEN ?? "",
+  // Web push (gere com: npx web-push generate-vapid-keys)
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY ?? "",
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY ?? "",
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT ?? "mailto:contato@example.com",
   FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
 };

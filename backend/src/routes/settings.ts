@@ -13,6 +13,8 @@ const aiSettingsSchema = z.object({
   afterHoursMessage: z.string().optional(),
   followUpEnabled: z.boolean().optional(),
   followUpHours: z.number().int().min(1).max(72).optional(),
+  postVisitEnabled: z.boolean().optional(),
+  googleReviewUrl: z.string().url().nullable().optional(),
   reminderHours1: z.number().int().min(1).max(168).optional(),
   reminderHours2: z.number().int().min(1).max(168).nullable().optional(),
   minAdvanceMinutes: z.number().int().min(0).optional(),
@@ -21,7 +23,9 @@ const aiSettingsSchema = z.object({
 });
 
 export async function settingsRoutes(app: FastifyInstance) {
+  // Configurações são território do dono (STAFF opera conversas/agenda/CRM)
   app.addHook("preHandler", app.authenticate);
+  app.addHook("preHandler", app.requireOwner);
 
   app.get("/settings", async (req) => {
     const tenant = await prisma.tenant.findUniqueOrThrow({

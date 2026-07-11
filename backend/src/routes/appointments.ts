@@ -3,19 +3,21 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getFreeSlots, createAppointmentSafe } from "../core/slots.js";
 import { scheduleReminders, cancelReminders } from "../core/reminders.js";
+import { jobsQueue } from "../queues.js";
 
 export async function appointmentRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
-  // Agenda de um dia
+  // Agenda de um dia (opcionalmente filtrada por profissional)
   app.get("/appointments", async (req) => {
-    const { date } = req.query as { date?: string };
+    const { date, professionalId } = req.query as { date?: string; professionalId?: string };
     const day = date ? new Date(`${date}T00:00:00`) : new Date(new Date().setHours(0, 0, 0, 0));
     const dayEnd = new Date(day.getTime() + 24 * 60 * 60 * 1000);
     return prisma.appointment.findMany({
       where: {
         tenantId: req.user.tenantId,
         startsAt: { gte: day, lt: dayEnd },
+        ...(professionalId ? { professionalId } : {}),
       },
       include: { contact: true, service: true, professional: true },
       orderBy: { startsAt: "asc" },
@@ -131,7 +133,23 @@ export async function appointmentRoutes(app: FastifyInstance) {
         data: { status: contactStatus as any },
       });
     }
-    if (body.status === "CANCELADO") await cancelReminders(id);
+    if (body.status === "CANCELADO") {
+      await cancelReminders(id);
+      // Horário vagou: aciona a lista de espera
+      await jobsQueue.add("process-waitlist", {
+        kind: "process-waitlist",
+        tenantId: req.user.tenantId,
+        appointmentId: id,
+      });
+    }
+    if (body.status === "CONCLUIDO") {
+      // Pós-consulta: agradecimento + avaliação, 1 hora depois
+      await jobsQueue.add(
+        "send-postvisit",
+        { kind: "send-postvisit", tenantId: req.user.tenantId, appointmentId: id },
+        { delay: 60 * 60 * 1000 },
+      );
+    }
 
     return updated;
   });
@@ -183,29 +201,35 @@ export async function appointmentRoutes(app: FastifyInstance) {
     });
   });
 
+  // Substitui as regras de UM escopo: geral (professionalId null) ou de um
+  // profissional específico — as grades dos outros escopos ficam intactas.
   app.put("/availability-rules", async (req) => {
     const body = z
       .object({
+        professionalId: z.string().nullable().optional(),
         rules: z.array(
           z.object({
             weekday: z.number().int().min(0).max(6),
             startTime: z.string().regex(/^\d{2}:\d{2}$/),
             endTime: z.string().regex(/^\d{2}:\d{2}$/),
-            professionalId: z.string().nullable().optional(),
           }),
         ),
       })
       .parse(req.body);
 
+    const professionalId = body.professionalId ?? null;
+
     await prisma.$transaction([
-      prisma.availabilityRule.deleteMany({ where: { tenantId: req.user.tenantId } }),
+      prisma.availabilityRule.deleteMany({
+        where: { tenantId: req.user.tenantId, professionalId },
+      }),
       prisma.availabilityRule.createMany({
         data: body.rules.map((r) => ({
           tenantId: req.user.tenantId,
           weekday: r.weekday,
           startTime: r.startTime,
           endTime: r.endTime,
-          professionalId: r.professionalId ?? null,
+          professionalId,
         })),
       }),
     ]);

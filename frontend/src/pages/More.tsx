@@ -6,20 +6,22 @@ const ITEMS = [
   { to: "/servicos", label: "Serviços e preços", desc: "O que a IA oferece e agenda" },
   { to: "/horarios", label: "Horários e bloqueios", desc: "Quando a IA pode agendar; folgas e feriados" },
   { to: "/relatorios", label: "Relatórios", desc: "Conversão, no-show e leads por período" },
-  { to: "/minha-ia", label: "Minha IA", desc: "Conexão WhatsApp, follow-up, base de conhecimento" },
+  { to: "/minha-ia", label: "Minha IA", desc: "Conexão WhatsApp, follow-up, base de conhecimento", ownerOnly: true },
+  { to: "/equipe", label: "Equipe", desc: "Convide a recepção pro painel", ownerOnly: true },
   { to: "/playground", label: "Testar minha IA", desc: "Converse com sua atendente antes de ativar" },
   { to: "/notificacoes", label: "Notificações", desc: "Avisos de agendamentos e escalações" },
-  { to: "/plano", label: "Meu plano", desc: "Assinatura e ciclo de cobrança" },
+  { to: "/plano", label: "Meu plano", desc: "Assinatura e ciclo de cobrança", ownerOnly: true },
 ];
 
 export default function More() {
   const { me, logout } = useAuth();
+  const isOwner = me?.user.role === "OWNER";
 
   return (
     <div>
       <PageHeader title={me?.tenant.name ?? "Mais"} subtitle={me?.user.email} />
       <div className="space-y-2">
-        {ITEMS.map((i) => (
+        {ITEMS.filter((i) => isOwner || !i.ownerOnly).map((i) => (
           <Link key={i.to} to={i.to} className="card flex items-center justify-between py-3.5 transition hover:border-pine/40">
             <div>
               <div className="text-sm font-semibold">{i.label}</div>

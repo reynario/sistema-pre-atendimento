@@ -99,12 +99,15 @@ Para atualizar a versão em produção depois de um push na main:
 - Lembretes de consulta (2 disparos configuráveis) com confirmação pelo chat
 - Agenda nativa com anti-overbooking (transação serializável)
 - Mini CRM com funil, notificações internas, playground da IA
-- Multi-tenant com trial de 14 dias e escolha de plano
+- Multi-tenant com trial de 14 dias (IA pausa quando expira) e escolha de plano
+- Equipe: convite por link (papéis dono/recepção; config e plano só pro dono)
+- Web push no celular (requer chaves VAPID — `npx web-push generate-vapid-keys`)
+- Pós-consulta: agradecimento + pedido de avaliação no Google
+- Multi-profissional: agenda filtrada e grade de horários por profissional
+- Lista de espera com aviso automático no WhatsApp quando um horário vaga
+- Relatórios, horários/bloqueios, onboarding guiado e monitor de conexão UazAPI
 
 ## Próximos passos (Fase 2)
 
 - Billing automatizado (Asaas/Mercado Pago) e limites por plano
-- Papéis de usuário (dono vs. recepção) e convites de equipe
-- Relatórios (conversão, no-show, origem)
-- Push notifications reais (service worker) — hoje o painel usa polling
-- Lista de espera / encaixe
+- Monitor de custo de IA por tenant, rate limiting, testes do motor de horários

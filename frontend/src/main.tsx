@@ -8,3 +8,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Service worker de push (não faz cache do app)
+if ("serviceWorker" in navigator) {
+  void navigator.serviceWorker.register("/sw.js").catch(() => {});
+}

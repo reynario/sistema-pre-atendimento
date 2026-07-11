@@ -10,13 +10,21 @@ export default function Agenda() {
   const [date, setDate] = useState(() => toISODate(new Date()));
   const [items, setItems] = useState<any[] | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [professionalId, setProfessionalId] = useState<string>("");
+
+  useEffect(() => {
+    void api<any[]>("/professionals").then(setProfessionals).catch(() => {});
+  }, []);
 
   const load = () => {
     setItems(null);
-    void api<any[]>(`/appointments?date=${date}`).then(setItems).catch(() => setItems([]));
+    const params = new URLSearchParams({ date });
+    if (professionalId) params.set("professionalId", professionalId);
+    void api<any[]>(`/appointments?${params}`).then(setItems).catch(() => setItems([]));
   };
 
-  useEffect(load, [date]);
+  useEffect(load, [date, professionalId]);
 
   const shiftDay = (delta: number) => {
     const d = new Date(`${date}T12:00:00`);
@@ -45,6 +53,30 @@ export default function Agenda() {
           </button>
         }
       />
+
+      {professionals.length > 0 && (
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setProfessionalId("")}
+            className={`chip flex-none px-3.5 py-2 ${
+              professionalId === "" ? "bg-ink text-surface" : "border border-ink/10 bg-surface text-ink-muted"
+            }`}
+          >
+            Todos
+          </button>
+          {professionals.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setProfessionalId(p.id)}
+              className={`chip flex-none px-3.5 py-2 ${
+                professionalId === p.id ? "bg-ink text-surface" : "border border-ink/10 bg-surface text-ink-muted"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mb-4 flex items-center gap-3">
         <button className="btn-ghost px-3 py-2" onClick={() => shiftDay(-1)}>←</button>
@@ -104,14 +136,31 @@ export default function Agenda() {
         </div>
       )}
 
-      {showNew && <NewAppointment date={date} onClose={() => { setShowNew(false); load(); }} />}
+      {showNew && (
+        <NewAppointment
+          date={date}
+          professionals={professionals}
+          onClose={() => { setShowNew(false); load(); }}
+        />
+      )}
+
+      <Waitlist />
     </div>
   );
 }
 
-function NewAppointment({ date, onClose }: { date: string; onClose: () => void }) {
+function NewAppointment({
+  date,
+  professionals,
+  onClose,
+}: {
+  date: string;
+  professionals: any[];
+  onClose: () => void;
+}) {
   const [services, setServices] = useState<any[]>([]);
   const [serviceId, setServiceId] = useState("");
+  const [professionalId, setProfessionalId] = useState("");
   const [day, setDay] = useState(date);
   const [slots, setSlots] = useState<any[] | null>(null);
   const [slot, setSlot] = useState("");
@@ -132,10 +181,12 @@ function NewAppointment({ date, onClose }: { date: string; onClose: () => void }
     if (!serviceId) return;
     setSlots(null);
     setSlot("");
-    void api<any[]>(`/appointments/slots?date=${day}&serviceId=${serviceId}`)
+    const params = new URLSearchParams({ date: day, serviceId });
+    if (professionalId) params.set("professionalId", professionalId);
+    void api<any[]>(`/appointments/slots?${params}`)
       .then(setSlots)
       .catch(() => setSlots([]));
-  }, [serviceId, day]);
+  }, [serviceId, day, professionalId]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +197,7 @@ function NewAppointment({ date, onClose }: { date: string; onClose: () => void }
         method: "POST",
         body: {
           serviceId,
+          professionalId: professionalId || null,
           startsAt: slot,
           contactName: name || undefined,
           contactPhone: phone,
@@ -192,6 +244,17 @@ function NewAppointment({ date, onClose }: { date: string; onClose: () => void }
             ))}
           </select>
         </div>
+        {professionals.length > 0 && (
+          <div>
+            <label className="label">Profissional</label>
+            <select className="input" value={professionalId} onChange={(e) => setProfessionalId(e.target.value)}>
+              <option value="">Qualquer</option>
+              {professionals.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="label">Dia</label>
           <input type="date" className="input" value={day} onChange={(e) => setDay(e.target.value)} />
@@ -233,5 +296,54 @@ function NewAppointment({ date, onClose }: { date: string; onClose: () => void }
         </div>
       </form>
     </div>
+  );
+}
+
+function Waitlist() {
+  const [entries, setEntries] = useState<any[] | null>(null);
+
+  const load = () => {
+    void api<any[]>("/waitlist").then(setEntries).catch(() => setEntries([]));
+  };
+  useEffect(load, []);
+
+  const remove = async (id: string) => {
+    await api(`/waitlist/${id}`, { method: "DELETE" });
+    load();
+  };
+
+  if (!entries || entries.length === 0) return null;
+
+  return (
+    <section className="mt-8">
+      <h2 className="label">Lista de espera ({entries.length})</h2>
+      <p className="mb-3 text-xs text-ink-muted">
+        Quando um horário é cancelado, o primeiro da lista (do mesmo serviço) é avisado
+        automaticamente no WhatsApp.
+      </p>
+      <div className="space-y-2">
+        {entries.map((w) => (
+          <div key={w.id} className="card flex items-center gap-3 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">{w.contact.name ?? w.contact.phone}</div>
+              <div className="text-xs text-ink-muted">
+                {w.service?.name ?? "Qualquer serviço"}
+                {w.notes ? ` · ${w.notes}` : ""}
+              </div>
+            </div>
+            {w.status === "AVISADO" && (
+              <span className="chip bg-marigold-tint text-marigold">Avisado</span>
+            )}
+            <button
+              className="chip flex-none border border-brick/30 text-brick"
+              onClick={() => void remove(w.id)}
+              title="Remover da lista"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

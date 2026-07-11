@@ -12,6 +12,9 @@ import { appointmentRoutes } from "./routes/appointments.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { reportRoutes } from "./routes/reports.js";
+import { teamRoutes } from "./routes/team.js";
+import { pushRoutes } from "./routes/push.js";
+import { waitlistRoutes } from "./routes/waitlist.js";
 import { playgroundRoutes } from "./routes/playground.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 
@@ -47,6 +50,9 @@ export async function buildServer() {
   await app.register(settingsRoutes);
   await app.register(notificationRoutes);
   await app.register(reportRoutes);
+  await app.register(teamRoutes);
+  await app.register(pushRoutes);
+  await app.register(waitlistRoutes);
   await app.register(playgroundRoutes);
   await app.register(webhookRoutes);
 

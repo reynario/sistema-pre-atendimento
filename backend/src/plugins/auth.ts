@@ -18,6 +18,7 @@ declare module "@fastify/jwt" {
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireOwner: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -29,6 +30,13 @@ export async function registerAuth(app: FastifyInstance) {
       await req.jwtVerify();
     } catch {
       reply.code(401).send({ error: "Não autenticado" });
+    }
+  });
+
+  // Ações restritas ao dono da clínica (plano, configurações, equipe)
+  app.decorate("requireOwner", async (req: FastifyRequest, reply: FastifyReply) => {
+    if (req.user?.role !== "OWNER") {
+      reply.code(403).send({ error: "Apenas o dono da conta pode fazer isso" });
     }
   });
 }

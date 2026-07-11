@@ -5,6 +5,7 @@ import { runSdr } from "../ai/sdr.js";
 import { whatsapp } from "../whatsapp/provider.js";
 import { notify } from "../core/notify.js";
 import { isSubscriptionActive, notifySubscriptionPaused } from "../core/subscription.js";
+import { processWaitlistForSlot } from "../core/waitlist.js";
 
 /** Verifica se agora está dentro do horário de atuação da IA da clínica. */
 function withinAiSchedule(tenant: {
@@ -226,6 +227,48 @@ async function sendFollowUp(tenantId: string, followUpId: string) {
 }
 
 /**
+ * Pós-consulta: agradecimento + pedido de avaliação no Google, enviado
+ * 1 hora depois de a recepção marcar "Compareceu". Uma vez por agendamento.
+ */
+async function sendPostVisit(tenantId: string, appointmentId: string) {
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: { contact: true, service: true, tenant: true },
+  });
+  if (!appointment || appointment.status !== "CONCLUIDO") return;
+  const { tenant, contact } = appointment;
+  if (!tenant.postVisitEnabled || contact.optOut || appointment.postVisitSentAt) return;
+
+  let text =
+    `Oi${contact.name ? `, ${contact.name}` : ""}! Passando pra agradecer sua visita à ` +
+    `${tenant.name} hoje. Esperamos que tenha gostado! 💚`;
+  if (tenant.googleReviewUrl) {
+    text += `\n\nSe puder, deixe uma avaliação pra gente — ajuda muito: ${tenant.googleReviewUrl}`;
+  }
+
+  await whatsapp.sendText(tenant, contact.phone, text);
+
+  const conversation = await prisma.conversation.upsert({
+    where: { contactId: contact.id },
+    create: { tenantId, contactId: contact.id },
+    update: { lastMessageAt: new Date() },
+  });
+  await prisma.message.create({
+    data: {
+      tenantId,
+      conversationId: conversation.id,
+      direction: "OUT",
+      sender: "SISTEMA",
+      content: text,
+    },
+  });
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { postVisitSentAt: new Date() },
+  });
+}
+
+/**
  * Verifica a conexão da instância UazAPI de cada clínica. Se caiu (celular
  * desligado, sessão expirada), avisa o dono — no máximo 1 aviso a cada 6h.
  */
@@ -270,6 +313,10 @@ export function startWorkers() {
           return sendFollowUp(data.tenantId, data.followUpId);
         case "check-whatsapp":
           return checkWhatsAppConnections();
+        case "send-postvisit":
+          return sendPostVisit(data.tenantId, data.appointmentId);
+        case "process-waitlist":
+          return processWaitlistForSlot(data.tenantId, data.appointmentId);
       }
     },
     { connection: redisConnection, concurrency: 5 },

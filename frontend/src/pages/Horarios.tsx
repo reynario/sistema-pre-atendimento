@@ -4,6 +4,13 @@ import { Empty, PageHeader } from "../components/ui";
 import ScheduleEditor from "../components/ScheduleEditor";
 
 export default function Horarios() {
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [scope, setScope] = useState<string | null>(null); // null = grade geral
+
+  useEffect(() => {
+    void api<any[]>("/professionals").then(setProfessionals).catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-8 pb-8">
       <div>
@@ -11,7 +18,36 @@ export default function Horarios() {
           title="Horários"
           subtitle="Os horários que a IA oferece aos leads no WhatsApp"
         />
-        <ScheduleEditor />
+        {professionals.length > 0 && (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setScope(null)}
+              className={`chip flex-none px-3.5 py-2 ${
+                scope === null ? "bg-ink text-surface" : "border border-ink/10 bg-surface text-ink-muted"
+              }`}
+            >
+              Grade geral
+            </button>
+            {professionals.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setScope(p.id)}
+                className={`chip flex-none px-3.5 py-2 ${
+                  scope === p.id ? "bg-ink text-surface" : "border border-ink/10 bg-surface text-ink-muted"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {scope !== null && (
+          <p className="mb-3 text-xs text-ink-muted">
+            Grade específica deste profissional — quando preenchida, substitui a grade geral pra ele.
+            Deixe tudo fechado pra voltar a usar a grade geral.
+          </p>
+        )}
+        <ScheduleEditor key={scope ?? "geral"} professionalId={scope} />
       </div>
       <Blocks />
     </div>

@@ -186,6 +186,34 @@ export default function MinhaIA() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <div className="text-sm font-semibold">Mensagem pós-consulta</div>
+            <div className="text-xs text-ink-muted">
+              Agradecimento 1h depois de marcar "Compareceu" (+ pedido de avaliação, se houver link)
+            </div>
+          </div>
+          <Toggle on={settings.postVisitEnabled} onChange={(v) => void patch({ postVisitEnabled: v })} />
+        </div>
+
+        {settings.postVisitEnabled && (
+          <div className="py-3">
+            <div className="mb-2 text-sm font-semibold">Link de avaliação no Google</div>
+            <input
+              className="input"
+              defaultValue={settings.googleReviewUrl ?? ""}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                void patch({ googleReviewUrl: v || null });
+              }}
+              placeholder="https://g.page/r/…/review"
+            />
+            <p className="mt-1.5 text-xs text-ink-faint">
+              No Perfil da Empresa no Google: "Pedir avaliações" → copie o link curto.
+            </p>
+          </div>
+        )}
+
         <div className="py-3 last:pb-0">
           <div className="mb-2 text-sm font-semibold">Tom de voz</div>
           <input

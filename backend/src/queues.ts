@@ -12,7 +12,9 @@ export type JobData =
   | { kind: "process-conversation"; tenantId: string; conversationId: string }
   | { kind: "send-reminder"; tenantId: string; reminderId: string }
   | { kind: "send-followup"; tenantId: string; followUpId: string }
-  | { kind: "check-whatsapp" };
+  | { kind: "check-whatsapp" }
+  | { kind: "send-postvisit"; tenantId: string; appointmentId: string }
+  | { kind: "process-waitlist"; tenantId: string; appointmentId: string };
 
 export const jobsQueue = new Queue<JobData, unknown, string>("alo-jobs", {
   connection: redisConnection,

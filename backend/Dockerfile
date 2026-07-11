@@ -18,4 +18,6 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY --from=build /app/dist ./dist
 EXPOSE 3333
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# db push sincroniza o schema no start (aditivo). Se um dia uma mudança for
+# destrutiva, ele se recusa e loga — aí a alteração deve ser feita manualmente.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
