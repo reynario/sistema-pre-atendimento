@@ -153,7 +153,7 @@ export async function webhookRoutes(app: FastifyInstance) {
       where: { contactId: contact.id, status: "PENDENTE" },
     });
     for (const fu of pendingFollowUps) {
-      await cancelJob(`followup:${fu.id}`);
+      await cancelJob(`followup-${fu.id}`);
     }
     if (pendingFollowUps.length > 0) {
       await prisma.followUp.updateMany({
@@ -166,7 +166,7 @@ export async function webhookRoutes(app: FastifyInstance) {
     // Mensagens picadas em sequência viram um único turno da IA.
     if (tenant.aiEnabled && conversation.status === "IA" && !contact.optOut) {
       await scheduleReplaceable(
-        `conv:${conversation.id}`,
+        `conv-${conversation.id}`,
         { kind: "process-conversation", tenantId: tenant.id, conversationId: conversation.id },
         DEBOUNCE_MS,
       );

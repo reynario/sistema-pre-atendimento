@@ -23,7 +23,7 @@ export async function scheduleReminders(tenantId: string, appointmentId: string)
       data: { tenantId, appointmentId, scheduledFor },
     });
     await scheduleReplaceable(
-      `reminder:${reminder.id}`,
+      `reminder-${reminder.id}`,
       { kind: "send-reminder", tenantId, reminderId: reminder.id },
       scheduledFor.getTime() - Date.now(),
     );

@@ -112,7 +112,7 @@ async function processConversation(tenantId: string, conversationId: string) {
         data: { tenantId, contactId: contact.id, scheduledFor, attempt: attempts + 1 },
       });
       await scheduleReplaceable(
-        `followup:${followUp.id}`,
+        `followup-${followUp.id}`,
         { kind: "send-followup", tenantId, followUpId: followUp.id },
         scheduledFor.getTime() - Date.now(),
       );
