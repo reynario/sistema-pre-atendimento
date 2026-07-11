@@ -20,7 +20,7 @@ function Icon({ d, className = "h-5 w-5" }: { d: string; className?: string }) {
 }
 
 export default function Layout() {
-  const { me } = useAuth();
+  const { me, logout } = useAuth();
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -89,7 +89,21 @@ export default function Layout() {
             {n.label}
           </NavLink>
         ))}
-        <div className="mt-auto px-3 text-xs text-ink-faint">{me?.tenant.name}</div>
+        <div className="mt-auto space-y-2">
+          <div className="px-3 text-xs text-ink-faint">
+            {me?.tenant.name}
+            <span className="block truncate">{me?.user.email}</span>
+          </div>
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-brick hover:bg-brick-tint/60"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3" />
+            </svg>
+            Sair
+          </button>
+        </div>
       </aside>
 
       {/* Conteúdo */}
