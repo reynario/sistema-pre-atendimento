@@ -1,0 +1,11 @@
+// Configuração do Cloudflare Workers (deploy do frontend como assets estáticos).
+// O build do Vite gera ./dist e o wrangler publica esse diretório.
+{
+  "name": "sistema-pre-atendimento",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./dist",
+    // SPA: qualquer rota (/agenda, /conversas/...) devolve o index.html
+    "not_found_handling": "single-page-application"
+  }
+}
