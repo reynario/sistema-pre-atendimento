@@ -34,8 +34,12 @@ export const jobsQueue = new Queue<JobData, unknown, string>("alo-jobs", {
 export async function scheduleReplaceable(jobId: string, data: JobData, delayMs: number) {
   const existing = await jobsQueue.getJob(jobId);
   if (existing) {
+    // Remove o job anterior em qualquer estado (menos 'active', que está travado
+    // pelo worker). Sem remover jobs 'completed'/'failed', o BullMQ deduplica pelo
+    // jobId e ignora silenciosamente o add() — fazendo a IA parar de responder a
+    // partir da 2ª mensagem de cada conversa.
     const state = await existing.getState().catch(() => null);
-    if (state === "delayed" || state === "waiting") {
+    if (state !== "active") {
       await existing.remove().catch(() => {});
     }
   }
