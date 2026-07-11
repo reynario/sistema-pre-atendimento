@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { prisma } from "../db.js";
 import { env } from "../env.js";
+import { isSubscriptionActive } from "../core/subscription.js";
 
 const registerSchema = z.object({
   clinicName: z.string().min(2),
@@ -100,6 +101,7 @@ export async function authRoutes(app: FastifyInstance) {
         slug: tenant.slug,
         planCycle: tenant.planCycle,
         subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionActive: isSubscriptionActive(tenant),
         trialEndsAt: tenant.trialEndsAt,
         whatsappConnected: Boolean(tenant.uazapiToken),
         webhookUrl: `${env.PUBLIC_URL}/webhooks/uazapi/${tenant.webhookToken}`,

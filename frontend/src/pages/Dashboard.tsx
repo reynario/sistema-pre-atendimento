@@ -10,6 +10,40 @@ type Data = {
   awaitingConversations: any[];
 };
 
+function TrialBanner() {
+  const { me } = useAuth();
+  if (!me) return null;
+  const { subscriptionStatus, subscriptionActive, trialEndsAt } = me.tenant;
+
+  // Assinatura paga em dia: nada a mostrar
+  if (subscriptionStatus === "ATIVA") return null;
+
+  if (!subscriptionActive) {
+    return (
+      <Link to="/plano" className="card block border-brick bg-brick-tint/60 text-sm">
+        <strong className="text-brick">Sua IA está pausada.</strong>{" "}
+        <span className="text-ink-muted">
+          O período de teste terminou e os leads não estão sendo respondidos. Assine para reativar →
+        </span>
+      </Link>
+    );
+  }
+
+  if (subscriptionStatus === "TRIAL" && trialEndsAt) {
+    const daysLeft = Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000));
+    if (daysLeft > 5) return null; // só chama atenção na reta final
+    return (
+      <Link to="/plano" className="card block border-marigold bg-marigold-tint/60 text-sm">
+        <strong className="text-marigold">
+          {daysLeft === 0 ? "Último dia de teste." : `Faltam ${daysLeft} dia${daysLeft === 1 ? "" : "s"} de teste.`}
+        </strong>{" "}
+        <span className="text-ink-muted">Assine para a IA continuar atendendo →</span>
+      </Link>
+    );
+  }
+  return null;
+}
+
 export default function Dashboard() {
   const { me } = useAuth();
   const [data, setData] = useState<Data | null>(null);
@@ -29,6 +63,8 @@ export default function Dashboard() {
         <h1 className="font-display text-xl font-bold">Bom dia, {firstName} 👋</h1>
         <p className="mt-0.5 text-sm capitalize text-ink-muted">{today}</p>
       </div>
+
+      <TrialBanner />
 
       {!me?.tenant.whatsappConnected && (
         <Link to="/minha-ia" className="card block border-marigold bg-marigold-tint/60 text-sm">

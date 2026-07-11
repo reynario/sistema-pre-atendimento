@@ -8,6 +8,8 @@ const ICONS: Record<string, string> = {
   CANCELAMENTO: "✖️",
   CONFIRMACAO: "✅",
   FOLLOWUP: "💬",
+  ASSINATURA: "💳",
+  WHATSAPP: "📵",
 };
 
 export default function Notifications() {

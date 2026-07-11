@@ -1,9 +1,10 @@
 import { Worker } from "bullmq";
 import { prisma } from "../db.js";
-import { redisConnection, scheduleReplaceable, type JobData } from "../queues.js";
+import { jobsQueue, redisConnection, scheduleReplaceable, type JobData } from "../queues.js";
 import { runSdr } from "../ai/sdr.js";
 import { whatsapp } from "../whatsapp/provider.js";
 import { notify } from "../core/notify.js";
+import { isSubscriptionActive, notifySubscriptionPaused } from "../core/subscription.js";
 
 /** Verifica se agora está dentro do horário de atuação da IA da clínica. */
 function withinAiSchedule(tenant: {
@@ -30,6 +31,12 @@ async function processConversation(tenantId: string, conversationId: string) {
 
   // Humano assumiu no meio do debounce, IA desligada ou lead pediu opt-out
   if (conversation.status !== "IA" || !tenant.aiEnabled || contact.optOut) return;
+
+  // Trial expirado / assinatura inativa: IA pausa e avisa o dono (1x/dia)
+  if (!isSubscriptionActive(tenant)) {
+    await notifySubscriptionPaused(tenant);
+    return;
+  }
 
   const recent = await prisma.message.findMany({
     where: { conversationId },
@@ -174,6 +181,12 @@ async function sendFollowUp(tenantId: string, followUpId: string) {
     return;
   }
 
+  // Assinatura inativa: follow-ups suspensos (lembretes de consulta continuam)
+  if (!isSubscriptionActive(tenant)) {
+    await prisma.followUp.update({ where: { id: followUpId }, data: { status: "CANCELADO" } });
+    return;
+  }
+
   const text =
     followUp.attempt === 1
       ? `Oi${contact.name ? `, ${contact.name}` : ""}! Ficou alguma dúvida? Posso te ajudar a escolher um horário 😊`
@@ -212,6 +225,37 @@ async function sendFollowUp(tenantId: string, followUpId: string) {
   }
 }
 
+/**
+ * Verifica a conexão da instância UazAPI de cada clínica. Se caiu (celular
+ * desligado, sessão expirada), avisa o dono — no máximo 1 aviso a cada 6h.
+ */
+async function checkWhatsAppConnections() {
+  const tenants = await prisma.tenant.findMany({
+    where: { uazapiToken: { not: null }, aiEnabled: true },
+  });
+  for (const tenant of tenants) {
+    try {
+      const status = await whatsapp.getStatus(tenant);
+      if (status.connected) continue;
+
+      const since = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      const recent = await prisma.notification.findFirst({
+        where: { tenantId: tenant.id, type: "WHATSAPP", createdAt: { gte: since } },
+      });
+      if (recent) continue;
+
+      await notify(
+        tenant.id,
+        "WHATSAPP",
+        "WhatsApp desconectado",
+        "A conexão com o WhatsApp caiu — os leads não estão sendo respondidos. Abra o painel da UazAPI e escaneie o QR code novamente.",
+      );
+    } catch (err: any) {
+      console.error(`[whatsapp-check] falha para ${tenant.slug}:`, err?.message);
+    }
+  }
+}
+
 export function startWorkers() {
   const worker = new Worker<JobData>(
     "alo-jobs",
@@ -224,6 +268,8 @@ export function startWorkers() {
           return sendReminder(data.tenantId, data.reminderId);
         case "send-followup":
           return sendFollowUp(data.tenantId, data.followUpId);
+        case "check-whatsapp":
+          return checkWhatsAppConnections();
       }
     },
     { connection: redisConnection, concurrency: 5 },
@@ -232,6 +278,13 @@ export function startWorkers() {
   worker.on("failed", (job, err) => {
     console.error(`[worker] job ${job?.id} falhou:`, err.message);
   });
+
+  // Health-check da conexão WhatsApp a cada 15 minutos
+  void jobsQueue.upsertJobScheduler(
+    "check-whatsapp-scheduler",
+    { every: 15 * 60 * 1000 },
+    { name: "check-whatsapp", data: { kind: "check-whatsapp" } },
+  );
 
   return worker;
 }

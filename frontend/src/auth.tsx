@@ -8,6 +8,7 @@ export type Me = {
     slug: string;
     planCycle: string;
     subscriptionStatus: string;
+    subscriptionActive: boolean;
     trialEndsAt: string | null;
     whatsappConnected: boolean;
     webhookUrl: string;

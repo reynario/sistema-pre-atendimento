@@ -11,7 +11,8 @@ export const redisConnection = new Redis(env.REDIS_URL, {
 export type JobData =
   | { kind: "process-conversation"; tenantId: string; conversationId: string }
   | { kind: "send-reminder"; tenantId: string; reminderId: string }
-  | { kind: "send-followup"; tenantId: string; followUpId: string };
+  | { kind: "send-followup"; tenantId: string; followUpId: string }
+  | { kind: "check-whatsapp" };
 
 export const jobsQueue = new Queue<JobData, unknown, string>("alo-jobs", {
   connection: redisConnection,
