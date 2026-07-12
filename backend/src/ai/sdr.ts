@@ -39,99 +39,109 @@ function fmtDateTime(d: Date): string {
   });
 }
 
-const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+const tools: OpenAI.Responses.Tool[] = [
   {
     type: "function",
-    function: {
-      name: "listar_servicos",
-      description:
-        "Lista os serviços oferecidos pela clínica com preço, duração e profissional. Use antes de informar qualquer preço.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
+    strict: false,
+    name: "listar_servicos",
+    description:
+      "Lista os serviços oferecidos pela clínica com preço, duração e profissional. Use antes de informar qualquer preço.",
+    parameters: { type: "object", properties: {}, required: [] },
   },
   {
     type: "function",
-    function: {
-      name: "horarios_disponiveis",
-      description:
-        "Consulta os horários livres de um dia para um serviço. Use sempre que o lead quiser agendar — nunca invente horários.",
-      parameters: {
-        type: "object",
-        properties: {
-          data: { type: "string", description: "Data no formato YYYY-MM-DD" },
-          servico_id: { type: "string", description: "ID do serviço (de listar_servicos)" },
+    strict: false,
+    name: "listar_profissionais",
+    description:
+      "Lista os profissionais da clínica. Use para perguntar ao lead se ele prefere um profissional específico ou se pode ser qualquer um.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    type: "function",
+    strict: false,
+    name: "horarios_disponiveis",
+    description:
+      "Consulta os horários livres de um dia para um serviço. Use sempre que o lead quiser agendar — nunca invente horários.",
+    parameters: {
+      type: "object",
+      properties: {
+        data: { type: "string", description: "Data no formato YYYY-MM-DD" },
+        servico_id: { type: "string", description: "ID do serviço (de listar_servicos)" },
+        profissional_id: {
+          type: "string",
+          description:
+            "ID do profissional (de listar_profissionais), apenas se o lead preferir um específico",
         },
-        required: ["data", "servico_id"],
       },
+      required: ["data", "servico_id"],
     },
   },
   {
     type: "function",
-    function: {
-      name: "criar_agendamento",
-      description:
-        "Cria o agendamento após o lead confirmar explicitamente um horário. Use apenas horários retornados por horarios_disponiveis.",
-      parameters: {
-        type: "object",
-        properties: {
-          servico_id: { type: "string" },
-          data_hora: {
-            type: "string",
-            description: "Início no formato ISO retornado por horarios_disponiveis",
-          },
-          nome_cliente: { type: "string", description: "Nome do lead, se ele informou" },
+    strict: false,
+    name: "criar_agendamento",
+    description:
+      "Cria o agendamento após o lead confirmar explicitamente um horário. Use apenas horários retornados por horarios_disponiveis.",
+    parameters: {
+      type: "object",
+      properties: {
+        servico_id: { type: "string" },
+        data_hora: {
+          type: "string",
+          description: "Início no formato ISO retornado por horarios_disponiveis",
         },
-        required: ["servico_id", "data_hora"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "confirmar_agendamento",
-      description: "Confirma a presença do lead no próximo agendamento dele (resposta a lembrete).",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "cancelar_agendamento",
-      description: "Cancela o próximo agendamento do lead, a pedido dele.",
-      parameters: {
-        type: "object",
-        properties: { motivo: { type: "string" } },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "entrar_lista_espera",
-      description:
-        "Coloca o lead na lista de espera quando nenhum horário disponível serve pra ele. Se um horário vagar, ele é avisado automaticamente.",
-      parameters: {
-        type: "object",
-        properties: {
-          servico_id: { type: "string", description: "ID do serviço desejado, se souber" },
-          observacao: { type: "string", description: "Preferência do lead (ex: 'só de manhã')" },
+        profissional_id: {
+          type: "string",
+          description: "ID do profissional escolhido, se o lead preferiu um específico",
         },
-        required: [],
+        nome_cliente: { type: "string", description: "Nome do lead, se ele informou" },
       },
+      required: ["servico_id", "data_hora"],
     },
   },
   {
     type: "function",
-    function: {
-      name: "escalar_para_humano",
-      description:
-        "Transfere a conversa para a equipe humana. Use quando: o lead pedir para falar com uma pessoa, houver reclamação, ou você não souber responder com segurança.",
-      parameters: {
-        type: "object",
-        properties: { motivo: { type: "string", description: "Resumo curto do motivo" } },
-        required: ["motivo"],
+    strict: false,
+    name: "confirmar_agendamento",
+    description: "Confirma a presença do lead no próximo agendamento dele (resposta a lembrete).",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    type: "function",
+    strict: false,
+    name: "cancelar_agendamento",
+    description: "Cancela o próximo agendamento do lead, a pedido dele.",
+    parameters: {
+      type: "object",
+      properties: { motivo: { type: "string" } },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    strict: false,
+    name: "entrar_lista_espera",
+    description:
+      "Coloca o lead na lista de espera quando nenhum horário disponível serve pra ele. Se um horário vagar, ele é avisado automaticamente.",
+    parameters: {
+      type: "object",
+      properties: {
+        servico_id: { type: "string", description: "ID do serviço desejado, se souber" },
+        observacao: { type: "string", description: "Preferência do lead (ex: 'só de manhã')" },
       },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    strict: false,
+    name: "escalar_para_humano",
+    description:
+      "Transfere a conversa para a equipe humana. Use quando: o lead pedir para falar com uma pessoa, houver reclamação, ou você não souber responder com segurança.",
+    parameters: {
+      type: "object",
+      properties: { motivo: { type: "string", description: "Resumo curto do motivo" } },
+      required: ["motivo"],
     },
   },
 ];
@@ -157,6 +167,20 @@ async function resolveService(tenantId: string, idOrName: unknown) {
 const SERVICO_NAO_ENCONTRADO =
   "ERRO: serviço não encontrado. Chame listar_servicos e use o valor exato do campo id.";
 
+/** Mesma lógica tolerante do resolveService, para profissionais. */
+async function resolveProfessional(tenantId: string, idOrName: unknown) {
+  const raw = String(idOrName ?? "").trim();
+  if (!raw) return null;
+  const byId = await prisma.professional.findFirst({ where: { id: raw, tenantId } });
+  if (byId) return byId;
+  return prisma.professional.findFirst({
+    where: { tenantId, name: { contains: raw, mode: "insensitive" } },
+  });
+}
+
+const PROFISSIONAL_NAO_ENCONTRADO =
+  "ERRO: profissional não encontrado. Chame listar_profissionais e use o valor exato do campo id, ou omita para qualquer profissional.";
+
 async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> {
   const { tenant, contact, dryRun } = ctx;
 
@@ -177,14 +201,30 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         .join("\n");
     }
 
+    case "listar_profissionais": {
+      const professionals = await prisma.professional.findMany({
+        where: { tenantId: tenant.id },
+      });
+      if (professionals.length === 0)
+        return "Nenhum profissional cadastrado — não pergunte por preferência de profissional.";
+      return professionals.map((p) => `id=${p.id} | ${p.name}`).join("\n");
+    }
+
     case "horarios_disponiveis": {
       const service = await resolveService(tenant.id, input.servico_id);
       if (!service) return SERVICO_NAO_ENCONTRADO;
 
+      let professionalId: string | null = null;
+      if (input.profissional_id) {
+        const professional = await resolveProfessional(tenant.id, input.profissional_id);
+        if (!professional) return PROFISSIONAL_NAO_ENCONTRADO;
+        professionalId = professional.id;
+      }
+
       const date = String(input.data ?? "").trim();
       let slots;
       try {
-        slots = await getFreeSlots({ tenantId: tenant.id, date, serviceId: service.id });
+        slots = await getFreeSlots({ tenantId: tenant.id, date, serviceId: service.id, professionalId });
       } catch {
         return "ERRO: data inválida. Use o formato YYYY-MM-DD.";
       }
@@ -212,6 +252,14 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
       }
       const service = await resolveService(tenant.id, input.servico_id);
       if (!service) return SERVICO_NAO_ENCONTRADO;
+
+      let professionalId: string | null = null;
+      if (input.profissional_id) {
+        const professional = await resolveProfessional(tenant.id, input.profissional_id);
+        if (!professional) return PROFISSIONAL_NAO_ENCONTRADO;
+        professionalId = professional.id;
+      }
+
       const startsAt = new Date(String(input.data_hora));
       if (Number.isNaN(startsAt.getTime())) return "ERRO: data_hora inválida.";
 
@@ -227,6 +275,7 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
           tenantId: tenant.id,
           contactId: contact.id,
           serviceId: service.id,
+          professionalId,
           startsAt,
           createdBy: "IA",
         });
@@ -390,8 +439,16 @@ Seu papel (SDR): dar boas-vindas, tirar dúvidas sobre serviços e preços, qual
 Data e hora atual: ${now.toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })}.
 Horário de atendimento da clínica: ${tenant.aiScheduleStart} às ${tenant.aiScheduleEnd}, ${scheduleDays}.
 
+Fluxo de agendamento — siga nesta ordem, fazendo UMA pergunta por vez:
+1. Pergunte qual serviço o lead deseja (consulte listar_servicos; se houver só um serviço, apenas confirme).
+2. Se a clínica tiver mais de um profissional (listar_profissionais), pergunte se o lead prefere algum específico ou se pode ser qualquer um. Com um só profissional, não pergunte.
+3. Pergunte o dia desejado e consulte horarios_disponiveis; ofereça até 3 opções.
+4. Se ainda não souber o nome do lead, pergunte antes de fechar o agendamento.
+5. Com horário confirmado explicitamente pelo lead, use criar_agendamento.
+
 Regras obrigatórias:
 - NUNCA invente preços, serviços ou horários. Use as ferramentas listar_servicos e horarios_disponiveis.
+- NUNCA presuma qual serviço o lead quer — pergunte, mesmo que ele já tenha vindo pedindo horário.
 - Só crie um agendamento depois que o lead confirmar explicitamente um horário específico.
 - Ofereça no máximo 3 opções de horário por vez.
 - Se nenhum horário disponível servir para o lead, ofereça colocá-lo na lista de espera (entrar_lista_espera) — ele será avisado quando vagar.
@@ -425,11 +482,16 @@ export async function runSdr(params: {
     return result;
   }
 
-  const system = await buildSystemPrompt(tenant, contact);
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: system },
-    ...params.history.map((m) => ({ role: m.role, content: m.content })),
-  ];
+  const instructions = await buildSystemPrompt(tenant, contact);
+  const input: OpenAI.Responses.ResponseInputItem[] = params.history.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  // Modelos de raciocínio (gpt-5.x, o*) exigem o parâmetro `reasoning` e não
+  // aceitam function tools no chat/completions — por isso a Responses API.
+  // Modelos clássicos (gpt-4o*) não aceitam `reasoning`, então é condicional.
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(env.OPENAI_MODEL);
 
   // Consumo de tokens do turno inteiro (todas as iterações do loop)
   let usedInput = 0;
@@ -451,27 +513,24 @@ export async function runSdr(params: {
 
   // Loop agentico com limite de iterações
   for (let i = 0; i < 6; i++) {
-    const completion = await client.chat.completions.create({
+    const response = await client.responses.create({
       model: env.OPENAI_MODEL,
-      max_completion_tokens: 1024,
-      messages,
+      instructions,
+      input,
       tools,
+      // Reasoning consome parte do limite de saída, então a folga é maior
+      // que os 1024 da era chat/completions.
+      max_output_tokens: 2048,
+      ...(isReasoningModel ? { reasoning: { effort: "low" as const } } : {}),
     });
 
-    usedInput += completion.usage?.prompt_tokens ?? 0;
-    usedOutput += completion.usage?.completion_tokens ?? 0;
+    usedInput += response.usage?.input_tokens ?? 0;
+    usedOutput += response.usage?.output_tokens ?? 0;
 
-    const choice = completion.choices[0];
-    const message = choice?.message;
-    if (!message) {
-      result.reply = null;
-      result.escalated = true;
-      result.escalationReason = "IA não retornou resposta";
-      await recordUsage();
-      return result;
-    }
-
-    if (message.refusal) {
+    const refused = response.output.some(
+      (item) => item.type === "message" && item.content.some((c) => c.type === "refusal"),
+    );
+    if (refused) {
       result.reply = null;
       result.escalated = true;
       result.escalationReason = "IA recusou a solicitação (política de segurança)";
@@ -479,25 +538,34 @@ export async function runSdr(params: {
       return result;
     }
 
-    const toolCalls = message.tool_calls ?? [];
-    if (toolCalls.length === 0) {
-      result.reply = message.content?.trim() || null;
+    const functionCalls = response.output.filter(
+      (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call",
+    );
+    if (functionCalls.length === 0) {
+      result.reply = response.output_text.trim() || null;
+      if (result.reply === null) {
+        result.escalated = true;
+        result.escalationReason = "IA não retornou resposta";
+      }
       await recordUsage();
       return result;
     }
 
-    messages.push(message);
+    // Devolve a saída inteira (inclusive itens de raciocínio, obrigatórios
+    // para modelos reasoning) e os resultados de cada ferramenta. O cast é
+    // necessário porque a union de saída do SDK é mais larga que a de entrada
+    // (itens de computer-use, que este agente não usa).
+    input.push(...(response.output as OpenAI.Responses.ResponseInputItem[]));
 
-    for (const tc of toolCalls) {
-      if (tc.type !== "function") continue;
+    for (const fc of functionCalls) {
       let output: string;
       try {
-        const args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        output = await runTool(ctx, tc.function.name, args);
+        const args = fc.arguments ? JSON.parse(fc.arguments) : {};
+        output = await runTool(ctx, fc.name, args);
       } catch (err: any) {
         output = `ERRO ao executar ferramenta: ${err?.message ?? "desconhecido"}`;
       }
-      messages.push({ role: "tool", tool_call_id: tc.id, content: output });
+      input.push({ type: "function_call_output", call_id: fc.call_id, output });
     }
   }
 
