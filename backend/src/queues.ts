@@ -20,7 +20,9 @@ export const jobsQueue = new Queue<JobData, unknown, string>("alo-jobs", {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
-    backoff: { type: "exponential", delay: 5000 },
+    // 30s/60s entre tentativas: falha de envio por instância WhatsApp
+    // desconectada precisa de janela pra reconectar — 5s/10s era inútil.
+    backoff: { type: "exponential", delay: 30000 },
     removeOnComplete: 500,
     removeOnFail: 500,
   },

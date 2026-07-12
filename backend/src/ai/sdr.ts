@@ -136,6 +136,27 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
+/**
+ * Resolve o serviço a partir do que o modelo mandar: id exato ou, como
+ * fallback, nome aproximado — modelos menores às vezes passam o nome do
+ * serviço no lugar do id, e isso não pode derrubar a ferramenta com uma
+ * exceção do Prisma (era a causa de "não consegui verificar os horários").
+ */
+async function resolveService(tenantId: string, idOrName: unknown) {
+  const raw = String(idOrName ?? "").trim();
+  if (!raw) return null;
+  const byId = await prisma.service.findFirst({
+    where: { id: raw, tenantId, active: true },
+  });
+  if (byId) return byId;
+  return prisma.service.findFirst({
+    where: { tenantId, active: true, name: { contains: raw, mode: "insensitive" } },
+  });
+}
+
+const SERVICO_NAO_ENCONTRADO =
+  "ERRO: serviço não encontrado. Chame listar_servicos e use o valor exato do campo id.";
+
 async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> {
   const { tenant, contact, dryRun } = ctx;
 
@@ -157,12 +178,27 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
     }
 
     case "horarios_disponiveis": {
-      const slots = await getFreeSlots({
-        tenantId: tenant.id,
-        date: String(input.data),
-        serviceId: String(input.servico_id),
-      });
-      if (slots.length === 0) return "Nenhum horário livre nesse dia. Sugira outro dia ao lead.";
+      const service = await resolveService(tenant.id, input.servico_id);
+      if (!service) return SERVICO_NAO_ENCONTRADO;
+
+      const date = String(input.data ?? "").trim();
+      let slots;
+      try {
+        slots = await getFreeSlots({ tenantId: tenant.id, date, serviceId: service.id });
+      } catch {
+        return "ERRO: data inválida. Use o formato YYYY-MM-DD.";
+      }
+      if (slots.length === 0) {
+        // Dia sem grade cadastrada ≠ dia lotado: a IA precisa saber a diferença
+        // para não dizer "está tudo ocupado" quando a clínica nem abre.
+        const weekday = new Date(`${date}T00:00:00`).getDay();
+        const hasRules = await prisma.availabilityRule.count({
+          where: { tenantId: tenant.id, weekday },
+        });
+        return hasRules > 0
+          ? "Nenhum horário livre nesse dia. Sugira outro dia ao lead."
+          : "A clínica não atende nesse dia da semana. Sugira um dia em que ela abre (veja o horário de atendimento).";
+      }
       return slots
         .slice(0, 12)
         .map((s) => `${s.startsAt} (${fmtDateTime(new Date(s.startsAt))})`)
@@ -174,6 +210,8 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         ctx.result.sandboxNotes.push("Agendamento simulado (modo teste — nada foi gravado).");
         return `SIMULADO: agendamento criado para ${fmtDateTime(new Date(String(input.data_hora)))}. Confirme ao lead normalmente.`;
       }
+      const service = await resolveService(tenant.id, input.servico_id);
+      if (!service) return SERVICO_NAO_ENCONTRADO;
       const startsAt = new Date(String(input.data_hora));
       if (Number.isNaN(startsAt.getTime())) return "ERRO: data_hora inválida.";
 
@@ -188,7 +226,7 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         const appt = await createAppointmentSafe({
           tenantId: tenant.id,
           contactId: contact.id,
-          serviceId: String(input.servico_id),
+          serviceId: service.id,
           startsAt,
           createdBy: "IA",
         });
@@ -279,12 +317,21 @@ async function runTool(ctx: ToolCtx, name: string, input: any): Promise<string> 
         where: { tenantId: tenant.id, contactId: contact.id, status: "PENDENTE" },
       });
       if (existing) return "Este lead já está na lista de espera.";
+      // servico_id inválido não pode impedir a entrada na lista (era a causa
+      // da falha "probleminha para te colocar na lista de espera"): sem
+      // serviço resolvido, entra sem serviço e o desejo do lead vai nas notas.
+      const service = await resolveService(tenant.id, input?.servico_id);
+      const wanted =
+        !service && input?.servico_id ? `Serviço desejado: ${String(input.servico_id)}` : null;
+      const notes = [wanted, input?.observacao ? String(input.observacao) : null]
+        .filter(Boolean)
+        .join(" — ");
       await prisma.waitlistEntry.create({
         data: {
           tenantId: tenant.id,
           contactId: contact.id,
-          serviceId: input?.servico_id ? String(input.servico_id) : null,
-          notes: input?.observacao ? String(input.observacao) : null,
+          serviceId: service?.id ?? null,
+          notes: notes || null,
         },
       });
       await notify(

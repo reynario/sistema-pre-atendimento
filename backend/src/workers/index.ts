@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { prisma } from "../db.js";
-import { jobsQueue, redisConnection, scheduleReplaceable, type JobData } from "../queues.js";
+import { jobsQueue, redisConnection, scheduleReplaceable, cancelJob, type JobData } from "../queues.js";
 import { runSdr } from "../ai/sdr.js";
 import { whatsapp } from "../whatsapp/provider.js";
 import { notify } from "../core/notify.js";
@@ -65,7 +65,28 @@ async function processConversation(tenantId: string, conversationId: string) {
   }
 
   if (reply) {
-    await whatsapp.sendText(tenant, contact.phone, reply);
+    try {
+      await whatsapp.sendText(tenant, contact.phone, reply);
+    } catch (err) {
+      // Envio falhou (instância desconectada?). Sem este tratamento a resposta
+      // da IA se perdia em silêncio: o lead ficava no vácuo e ninguém ficava
+      // sabendo. Avisa o dono (no máximo 1x por hora) e relança o erro para o
+      // BullMQ tentar de novo com backoff.
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      const recentAlert = await prisma.notification.findFirst({
+        where: { tenantId, type: "WHATSAPP", createdAt: { gte: since } },
+      });
+      if (!recentAlert) {
+        await notify(
+          tenantId,
+          "WHATSAPP",
+          "Falha ao responder lead",
+          `Não consegui enviar a resposta para ${contact.name ?? contact.phone}. ` +
+            `Verifique a conexão do WhatsApp no painel — o lead está sem resposta.`,
+        );
+      }
+      throw err;
+    }
     await prisma.message.create({
       data: {
         tenantId,
@@ -87,6 +108,24 @@ async function processConversation(tenantId: string, conversationId: string) {
       where: { id: contact.id },
       data: { status: "CONVERSANDO" },
     });
+  }
+
+  // Conversa escalada para humano: cancela follow-ups pendentes de turnos
+  // anteriores — sem isso o robô mandava "Ficou alguma dúvida?" horas depois,
+  // em cima de uma conversa que já estava com a equipe.
+  if (result.escalated) {
+    const pending = await prisma.followUp.findMany({
+      where: { contactId: contact.id, status: "PENDENTE" },
+    });
+    for (const fu of pending) {
+      await cancelJob(`followup-${fu.id}`);
+    }
+    if (pending.length > 0) {
+      await prisma.followUp.updateMany({
+        where: { contactId: contact.id, status: "PENDENTE" },
+        data: { status: "CANCELADO" },
+      });
+    }
   }
 
   // Agenda follow-up de lead sumido (se habilitado, sem agendamento fechado e sem escalação)

@@ -5,6 +5,18 @@ import { transcribeAudio } from "../ai/transcribe.js";
 
 const DEBOUNCE_MS = 8000;
 
+/**
+ * Nome de perfil do WhatsApp só é aproveitado se parecer um nome de verdade:
+ * precisa ter ao menos 2 caracteres e conter alguma letra. Perfis com nome
+ * ".", "🙂" etc. viram null (senão os templates geram "Oi, .!").
+ */
+function sanitizeName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.trim();
+  if (name.length < 2 || !/\p{L}/u.test(name)) return null;
+  return name;
+}
+
 type InboundMessage = {
   phone: string;
   text: string | null;
@@ -57,7 +69,7 @@ function normalizeInbound(body: any): InboundMessage | null {
     text = null;
   }
 
-  const senderName: string | null = msg.senderName ?? msg.pushName ?? msg.notifyName ?? null;
+  const senderName = sanitizeName(msg.senderName ?? msg.pushName ?? msg.notifyName);
 
   return { phone, text, audioUrl, audioBase64, senderName, fromMe };
 }
